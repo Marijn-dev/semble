@@ -12,18 +12,18 @@ class TrajectorySampler:
                  dynamics: Dynamics,
                  control_delta,
                  control_generator: SequenceGenerator,
-                 method,
+                 method=None,
                  initial_state_generator: InitialStateGenerator = None):
         self._n = dynamics.n
-        self._ode_method = method
+        self._ode_method = dynamics.default_method if not method else method
         self._dyn = dynamics
         self._delta = control_delta  # control sampling time
         self._seq_gen = control_generator
 
         self.state_generator = (initial_state_generator
                                 if initial_state_generator else
-                                GaussianInitialState(self._n))
-        
+                                dynamics.default_initial_state())
+
         self._rng = np.random.default_rng()
 
         self._init_time = 0.
@@ -49,7 +49,8 @@ class TrajectorySampler:
 
             return self._dyn(y, u)
 
-        t_samples = self._init_time + (time_horizon - self._init_time) * lhs(n_samples, self._rng)
+        t_samples = self._init_time + (time_horizon - self._init_time) * lhs(
+            n_samples, self._rng)
         t_samples = np.sort(np.append(t_samples, [self._init_time]))
 
         traj = solve_ivp(
@@ -65,8 +66,10 @@ class TrajectorySampler:
 
         return y0, t, y, control_seq
 
+
 def lhs(n_samples, rng):
-    '''Performs Latin Hypercube sampling in on the unit interval.'''
+    '''Performs Latin Hypercube sampling on the unit interval.'''
     bins_start_val = np.linspace(0., 1., n_samples + 1)[:-1]
-    samples = rng.uniform(size=(n_samples,)) / n_samples  # sample a delta for each bin
+    samples = rng.uniform(
+        size=(n_samples, )) / n_samples  # sample a delta for each bin
     return bins_start_val + samples

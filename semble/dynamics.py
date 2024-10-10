@@ -1,4 +1,5 @@
 import numpy as np
+from . import initial_state
 
 
 class Dynamics:
@@ -10,8 +11,18 @@ class Dynamics:
         self.mask = mask if mask is not None else self.n * (1, )
         self.p = sum(self.mask)
 
+        self._method = "RK45"
+
     def __call__(self, x, u):
         return self._dx(x, u)
+
+    def default_initial_state(self) -> initial_state.InitialStateGenerator:
+        """Returns an instance of the default initial state sampler."""
+        return initial_state.GaussianInitialState(self.n)
+
+    @property
+    def default_method(self) -> str:
+        return self._method
 
     def dims(self):
         return (self.n, self.m, self.p)
@@ -33,6 +44,7 @@ class VanDerPol(Dynamics):
 
     def __init__(self, damping):
         super().__init__(2, 1)
+
         self.damping = damping
 
     def _dx(self, x, u):
@@ -48,6 +60,8 @@ class FitzHughNagumo(Dynamics):
 
     def __init__(self, tau, a, b):
         super().__init__(2, 1)
+        self._method = "BDF"
+
         self.tau = tau
         self.a = a
         self.b = b
@@ -81,6 +95,7 @@ class HodgkinHuxleyFS(Dynamics):
 
     def __init__(self):
         super().__init__(4, 1, (1, 0, 0, 0))
+        self._method = "BDF"
 
         self.time_scale = 100.
         self.v_scale = 100.
@@ -98,6 +113,9 @@ class HodgkinHuxleyFS(Dynamics):
         self.g_k = 10.
         self.g_na = 56.
         self.g_l = 1.5e-2
+
+    def default_initial_state(self):
+        return initial_state.HHFSInitialState()
 
     def _dx(self, x, u):
         v, n, m, h = x
@@ -131,6 +149,7 @@ class HodgkinHuxleyRSA(Dynamics):
 
     def __init__(self):
         super().__init__(5, 1, (1, 0, 0, 0, 0))
+        self._method = "BDF"
 
         self.time_scale = 100.
         self.v_scale = 100.
@@ -150,6 +169,9 @@ class HodgkinHuxleyRSA(Dynamics):
         self.g_na = 56.
         self.g_l = 2.05e-2
         self.t_max = 608.
+
+    def default_initial_state(self):
+        return initial_state.HHRSAInitialState()
 
     def _dx(self, x, u):
         v, p, n, m, h = x
@@ -188,6 +210,7 @@ class HodgkinHuxleyIB(Dynamics):
 
     def __init__(self):
         super().__init__(7, 1, (1, 0, 0, 0, 0, 0, 0))
+        self.method = "BDF"
 
         self.time_scale = 100.
         self.v_scale = 100.
@@ -209,6 +232,9 @@ class HodgkinHuxleyIB(Dynamics):
         self.g_na = 50.
         self.g_l = 0.01
         self.t_max = 608.
+
+    def default_initial_state(self):
+        return initial_state.HHIBInitialState()
 
     def _dx(self, x, u):
         v, p, q, s, n, m, h = x
@@ -260,11 +286,15 @@ class HodgkinHuxleyFFE(Dynamics):
 
     def __init__(self):
         super().__init__(10, 1, (1, 0, 0, 0, 0, 1, 0, 0, 0, 0))
+        self._method = "BDF"
 
         self.rsa = HodgkinHuxleyRSA()
         self.v_scale = self.rsa.v_scale
         self.time_scale = self.rsa.time_scale
         self.eps = 0.1
+
+    def default_initial_state(self):
+        return initial_state.HHFFEInitialState()
 
     def _dx(self, x, u):
         x_in = x[:5]
@@ -285,6 +315,7 @@ class HodgkinHuxleyFBE(Dynamics):
 
     def __init__(self):
         super().__init__(11, 1, (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0))
+        self._method = "BDF"
 
         self.rsa = HodgkinHuxleyRSA()
         self.v_scale = self.rsa.v_scale
@@ -297,6 +328,9 @@ class HodgkinHuxleyFBE(Dynamics):
         self.tau_r = 0.5
         self.tau_d = 8.
         self.v0 = -20.
+
+    def default_initial_state(self):
+        return initial_state.HHFBEInitialState()
 
     def _dx(self, x, u):
         x_in = x[:5]
@@ -348,9 +382,13 @@ class TwoTank(Dynamics):
 
     def __init__(self):
         super().__init__(2, 2)
+        self._method = "BDF"
 
         self.c1 = 0.08  # inlet valve coefficient
         self.c2 = 0.04  # outlet valve coefficient
+
+    def default_initial_state(self):
+        return initial_state.UniformInitialState(self.n)
 
     def _dx(self, x, u):
         h1, h2 = x
