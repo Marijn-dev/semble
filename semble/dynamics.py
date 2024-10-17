@@ -210,7 +210,7 @@ class HodgkinHuxleyIB(Dynamics):
 
     def __init__(self):
         super().__init__(7, 1, (1, 0, 0, 0, 0, 0, 0))
-        self.method = "BDF"
+        self._method = "BDF"
 
         self.time_scale = 100.
         self.v_scale = 100.
