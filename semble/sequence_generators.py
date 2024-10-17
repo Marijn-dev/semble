@@ -114,7 +114,7 @@ class UniformSqWave(SequenceGenerator):
 class RandomWalkSequence(SequenceGenerator):
 
     def __init__(self, mean=0., std=1., dim=1, rng=None):
-        super().__init__(rng)
+        super().__init__(dim, rng)
 
         self._mean = mean
         self._std = std

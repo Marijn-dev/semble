@@ -3,7 +3,7 @@ import numpy as np
 
 from .dynamics import Dynamics
 from .sequence_generators import SequenceGenerator
-from .initial_state import InitialStateGenerator, GaussianInitialState
+from .initial_state import InitialStateGenerator
 
 
 class TrajectorySampler:
