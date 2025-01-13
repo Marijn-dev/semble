@@ -7,11 +7,16 @@ class SequenceGenerator:
         self.dim = dim
         self._rng = rng if rng else np.random.default_rng()
 
+    @property
+    def name(self) -> str:
+        return self.__class__.__name__
+
     def sample(self, time_range, delta):
         return self._sample_impl(time_range, delta)
 
 
 class Product(SequenceGenerator):
+
     def __init__(self, seq_gens, rng: np.random.Generator = None):
         super().__init__(len(seq_gens), rng)
         self._seq_gens = seq_gens
@@ -125,7 +130,8 @@ class RandomWalkSequence(SequenceGenerator):
 
         control_seq = np.cumsum(self._rng.normal(loc=self._mean,
                                                  scale=self._std,
-                                                 size=(n_control_vals, self.dim)),
+                                                 size=(n_control_vals,
+                                                       self.dim)),
                                 axis=1)
 
         return control_seq
@@ -151,3 +157,24 @@ class SinusoidalSequence(SequenceGenerator):
 
         return (amplitude * np.sin(np.pi * frequency / delta * time)).reshape(
             (-1, 1))
+
+
+_seqgen_names = {
+    "GaussianSequence": GaussianSequence,
+    "UniformSqWave": UniformSqWave,
+    "GaussianSqWave": GaussianSqWave,
+    "LogNormalSqWave": LogNormalSqWave,
+    "RandomWalkSequence": RandomWalkSequence,
+    "SinusoidalSequence": SinusoidalSequence,
+}
+
+
+def get_sequence_generator(name, args):
+    if name == "Product":
+        # args should be a list of tuples (name, args) for each coordinate.
+        components = [
+            get_sequence_generator(el["name"], el["args"]) for el in args
+        ]
+        return Product(components)
+    else:
+        return _seqgen_names[name](**args)

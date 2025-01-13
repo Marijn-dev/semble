@@ -21,6 +21,10 @@ class Dynamics:
         return initial_state.GaussianInitialState(self.n)
 
     @property
+    def name(self) -> str:
+        return self.__class__.__name__
+
+    @property
     def default_method(self) -> str:
         return self._method
 
@@ -407,3 +411,22 @@ class TwoTank(Dynamics):
             dh2 = 0.
 
         return (dh1, dh2)
+
+
+_dynamics_names = {
+    "LinearSys": LinearSys,
+    "VanDerPol": VanDerPol,
+    "FitzHughNagumo": FitzHughNagumo,
+    "Pendulum": Pendulum,
+    "HodgkinHuxleyFS": HodgkinHuxleyFS,
+    "HodgkinHuxleyRSA": HodgkinHuxleyRSA,
+    "HodgkinHuxleyIB": HodgkinHuxleyIB,
+    "HodgkinHuxleyFFE": HodgkinHuxleyFFE,
+    "HodgkinHuxleyFBE": HodgkinHuxleyFBE,
+    "GreenshieldsTraffic": GreenshieldsTraffic,
+    "TwoTank": TwoTank,
+}
+
+
+def get_dynamics(name, args):
+    return _dynamics_names[name](**args)

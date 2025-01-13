@@ -6,6 +6,10 @@ class InitialStateGenerator:
     def __init__(self, rng: np.random.Generator = None):
         self._rng = rng if rng else np.random.default_rng()
 
+    @property
+    def name(self) -> str:
+        return self.__class__.__name__
+
     def sample(self):
         return self._sample_impl()
 
@@ -108,3 +112,19 @@ class GreenshieldsInitialState(InitialStateGenerator):
         x0[self.sec_size * self.n_sec:-1] = x0[self.sec_size * self.n_sec - 1]
 
         return x0
+
+
+_initstategen_names = {
+    "GaussianInitialState": GaussianInitialState,
+    "UniformInitialState": UniformInitialState,
+    "HHFSInitialState": HHFSInitialState,
+    "HHRSAInitialState": HHRSAInitialState,
+    "HHIBInitialState": HHIBInitialState,
+    "HHFFEInitialState": HHFFEInitialState,
+    "HHFBEInitialState": HHFBEInitialState,
+    "GreenshieldsInitialState": GreenshieldsInitialState,
+}
+
+
+def get_initial_state_generator(name, args):
+    return _initstategen_names[name](**args)
