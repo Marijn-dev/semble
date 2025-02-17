@@ -35,6 +35,9 @@ class Dynamics:
 class LinearSys(Dynamics):
 
     def __init__(self, a, b):
+        a = np.array(a)
+        b = np.array(b)
+
         super().__init__(a.shape[0], b.shape[1])
 
         self.a = a
