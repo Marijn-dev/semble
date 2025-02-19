@@ -363,7 +363,6 @@ class GreenshieldsTraffic(Dynamics):
 
     def __init__(self, n, v0, dx=None):
         super().__init__(n, 1)
-
         self.inv_step = self.n if not dx else 1. / dx
         self.v0 = v0
 
@@ -415,6 +414,34 @@ class TwoTank(Dynamics):
 
         return (dh1, dh2)
 
+class Heat(Dynamics):
+    def __init__(self,n,alpha,input_locations,L,dx=None):
+        ''' 1 Dimensional heat equation with spatial temporal inputs
+        https://forschung.rwu.de/sites/forschung/files/2024-01/Embedded_Seminar_Report_Scheiter_Lauble_Qureshi.pdf
+        '''
+        super().__init__(n,2) # 
+        self.L = L # rod length [cm]
+        self.alpha = alpha # thermal diffusivity  [cm^2/s]
+        self.inv_x_step = 1/ (self.L/(n-1)) # 1/delta x
+        self.b = np.zeros((self.n,self.m)) # location of input 
+        self.input_locations = input_locations # location of boundaries of individual inputs
+
+        for i in range(0,n): # iterate over spatial grid
+            current_location = i/self.inv_x_step
+            for j in range(0,self.m):
+                if input_locations[j][0] <= current_location <= input_locations[j][1]:
+                    self.b[i][j] = 1
+
+    def _dx(self,x,u):
+
+        dt = self.alpha * (self.inv_x_step**2) * (np.roll(x, -1) - 2*x + np.roll(x, 1)) + self.b @ u
+        
+        # Neuman boundary conditions
+        dt[0] = self.alpha * (self.inv_x_step**2) * 2*(x[1]-x[0])
+        dt[-1] = self.alpha * (self.inv_x_step**2) * 2*(x[-2]-x[-1])
+
+        return dt
+
 
 _dynamics_names = {
     "LinearSys": LinearSys,
@@ -428,6 +455,7 @@ _dynamics_names = {
     "HodgkinHuxleyFBE": HodgkinHuxleyFBE,
     "GreenshieldsTraffic": GreenshieldsTraffic,
     "TwoTank": TwoTank,
+    "Heat": Heat,
 }
 
 
