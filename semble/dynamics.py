@@ -4,13 +4,14 @@ from . import initial_state
 
 class Dynamics:
 
-    def __init__(self, state_dim, control_dim, mask=None):
+    def __init__(self, state_dim, control_dim, mask=None,input_mask=None):
         self.n = state_dim
         self.m = control_dim
 
         self.mask = mask if mask is not None else self.n * (1, )
         self.p = sum(self.mask)
-
+        self.input_mask = None
+    
         self._method = "RK45"
 
     def __call__(self, x, u):
@@ -423,18 +424,19 @@ class Heat(Dynamics):
         self.L = L # rod length [cm]
         self.alpha = alpha # thermal diffusivity  [cm^2/s]
         self.inv_x_step = 1/ (self.L/(n-1)) # 1/delta x
-        self.b = np.zeros((self.n,self.m)) # location of input 
+        self.input_mask = np.zeros((self.n,self.m)) # location of input 
         self.input_locations = input_locations # location of boundaries of individual inputs
 
+        
         for i in range(0,n): # iterate over spatial grid
             current_location = i/self.inv_x_step
             for j in range(0,self.m):
                 if input_locations[j][0] <= current_location <= input_locations[j][1]:
-                    self.b[i][j] = 1
+                    self.input_mask[i][j] = 1
 
     def _dx(self,x,u):
 
-        dt = self.alpha * (self.inv_x_step**2) * (np.roll(x, -1) - 2*x + np.roll(x, 1)) + self.b @ u
+        dt = self.alpha * (self.inv_x_step**2) * (np.roll(x, -1) - 2*x + np.roll(x, 1)) + self.input_mask @ u
         
         # Neuman boundary conditions
         dt[0] = self.alpha * (self.inv_x_step**2) * 2*(x[1]-x[0])
