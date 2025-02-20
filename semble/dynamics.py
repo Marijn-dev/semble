@@ -11,7 +11,8 @@ class Dynamics:
         self.mask = mask if mask is not None else self.n * (1, )
         self.p = sum(self.mask)
         self.input_mask = None
-    
+        self.locations = None
+
         self._method = "RK45"
 
     def __call__(self, x, u):
@@ -426,10 +427,11 @@ class Heat(Dynamics):
         self.inv_x_step = 1/ (self.L/(n-1)) # 1/delta_x
         self.input_mask = np.zeros((self.n,self.m)) # location of input 
         self.input_locations = input_locations # location of boundaries of individual inputs
-
+        self.locations = []
         
         for i in range(0,n): # iterate over spatial grid
             current_location = i/self.inv_x_step
+            self.locations.append(current_location)
 
             for j in range(0,self.m): # iterate over the different input functions 
                 if input_locations[j][0] <= current_location <= input_locations[j][1]: # input should be activated if its in that region
