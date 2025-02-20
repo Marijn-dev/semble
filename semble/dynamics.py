@@ -423,15 +423,16 @@ class Heat(Dynamics):
         super().__init__(n,2) # 
         self.L = L # rod length [cm]
         self.alpha = alpha # thermal diffusivity  [cm^2/s]
-        self.inv_x_step = 1/ (self.L/(n-1)) # 1/delta x
+        self.inv_x_step = 1/ (self.L/(n-1)) # 1/delta_x
         self.input_mask = np.zeros((self.n,self.m)) # location of input 
         self.input_locations = input_locations # location of boundaries of individual inputs
 
         
         for i in range(0,n): # iterate over spatial grid
             current_location = i/self.inv_x_step
-            for j in range(0,self.m):
-                if input_locations[j][0] <= current_location <= input_locations[j][1]:
+
+            for j in range(0,self.m): # iterate over the different input functions 
+                if input_locations[j][0] <= current_location <= input_locations[j][1]: # input should be activated if its in that region
                     self.input_mask[i][j] = 1
 
     def _dx(self,x,u):
