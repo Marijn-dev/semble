@@ -441,9 +441,9 @@ class Heat(Dynamics):
 
         dt = self.alpha * (self.inv_x_step**2) * (np.roll(x, -1) - 2*x + np.roll(x, 1)) + self.input_mask @ u
         
-        # Neuman boundary conditions
-        dt[0] = self.alpha * (self.inv_x_step**2) * 2*(x[1]-x[0])
-        dt[-1] = self.alpha * (self.inv_x_step**2) * 2*(x[-2]-x[-1])
+        # Neuman boundary conditions, comment if you don't want them to be enforced
+        # dt[0] = self.alpha * (self.inv_x_step**2) * 2*(x[1]-x[0])
+        # dt[-1] = self.alpha * (self.inv_x_step**2) * 2*(x[-2]-x[-1])
 
         return dt
 
