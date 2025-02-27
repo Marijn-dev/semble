@@ -113,6 +113,22 @@ class GreenshieldsInitialState(InitialStateGenerator):
 
         return x0
 
+class HeatInitialState(InitialStateGenerator):
+    def __init__(self, n, L, rng: np.random.Generator = None):
+        super().__init__(rng)
+        self.size = n
+        self.L = L
+        self.x_points = np.linspace(0,L,n)
+        self.sigma = L/15
+
+    def _sample_impl(self):
+        firstpeak = np.random.uniform(0.1*self.L, 0.4*self.L)
+        secondpeak = np.random.uniform(0.6*self.L, 0.9*self.L)
+        x0 = 10*np.exp(-(self.x_points - firstpeak)**2 / (2 * self.sigma**2))
+        x0 += 10*np.exp(-(self.x_points - secondpeak+2)**2 / (2 * self.sigma**2))
+        
+        return x0
+
 
 _initstategen_names = {
     "GaussianInitialState": GaussianInitialState,
@@ -123,6 +139,7 @@ _initstategen_names = {
     "HHFFEInitialState": HHFFEInitialState,
     "HHFBEInitialState": HHFBEInitialState,
     "GreenshieldsInitialState": GreenshieldsInitialState,
+    "HeatInitialState": HeatInitialState,
 }
 
 
