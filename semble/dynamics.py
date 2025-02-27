@@ -417,7 +417,7 @@ class TwoTank(Dynamics):
         return (dh1, dh2)
 
 class Heat(Dynamics):
-    def __init__(self,n,alpha,input_locations,L,dx=None):
+    def __init__(self,n,alpha,L,dx=None):
         ''' 1 Dimensional heat equation with spatial temporal inputs
         https://forschung.rwu.de/sites/forschung/files/2024-01/Embedded_Seminar_Report_Scheiter_Lauble_Qureshi.pdf
         '''
@@ -425,22 +425,20 @@ class Heat(Dynamics):
         self.L = L # rod length [cm]
         self.alpha = alpha # thermal diffusivity  [cm^2/s]
         self.inv_x_step = 1/ (self.L/(n-1)) # 1/delta_x
-        self.input_mask = np.zeros((self.n,self.m)) # location of input 
-        self.input_locations = input_locations # location of boundaries of individual inputs
-        self.locations = []
+        self.locations = np.linspace(0, L, n)
+        self.sigma = 100/15
+
+    def set_input_mask(self):
+        self.first_input = np.random.uniform(0.1*self.L, 0.4*self.L)                        # location of first input
+        self.second_input = np.random.uniform(0.6*self.L, 0.9*self.L)                       # location of second input
+        self.b_1 = np.exp(-(self.locations -self.first_input)**2 / (2 * self.sigma**2))     # gaussian mask first input
+        self.b_2 = np.exp(-(self.locations -self.second_input)**2 / (2 * self.sigma**2))    # gaussian mask second input
+        self.input_mask = np.column_stack((self.b_1, self.b_2))                             # combine them
         
-        for i in range(0,n): # iterate over spatial grid
-            current_location = i/self.inv_x_step
-            self.locations.append(current_location)
-
-            for j in range(0,self.m): # iterate over the different input functions 
-                if input_locations[j][0] <= current_location <= input_locations[j][1]: # input should be activated if its in that region
-                    self.input_mask[i][j] = 1
-
     def _dx(self,x,u):
 
         dt = self.alpha * (self.inv_x_step**2) * (np.roll(x, -1) - 2*x + np.roll(x, 1)) + self.input_mask @ u
-        
+
         # Neuman boundary conditions, comment if you don't want them to be enforced
         # dt[0] = self.alpha * (self.inv_x_step**2) * 2*(x[1]-x[0])
         # dt[-1] = self.alpha * (self.inv_x_step**2) * 2*(x[-2]-x[-1])

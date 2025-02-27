@@ -25,6 +25,17 @@ class Product(SequenceGenerator):
         samples = tuple(g.sample(time_range, delta) for g in self._seq_gens)
 
         return np.hstack(samples)
+    
+class Spatial(SequenceGenerator):
+
+    def __init__(self, seq_gens, rng: np.random.Generator = None):
+        super().__init__(len(seq_gens), rng)
+        self._seq_gens = seq_gens
+
+    def _sample_impl(self, time_range, delta):
+        samples = tuple(g.sample(time_range, delta) for g in self._seq_gens)
+
+        return np.hstack(samples)
 
 
 class GaussianSequence(SequenceGenerator):
@@ -175,6 +186,6 @@ def get_sequence_generator(name, args):
         components = [
             get_sequence_generator(el["name"], el["args"]) for el in args
         ]
-        return Product(components)
+        return Product(components)        
     else:
         return _seqgen_names[name](**args)
