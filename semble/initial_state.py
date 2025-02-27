@@ -122,8 +122,8 @@ class HeatInitialState(InitialStateGenerator):
         self.sigma = L/15
 
     def _sample_impl(self):
-        firstpeak = np.random.uniform(0.1*self.L, 0.4*self.L)
-        secondpeak = np.random.uniform(0.6*self.L, 0.9*self.L)
+        firstpeak = np.random.uniform(0.1*self.L, 0.9*self.L)
+        secondpeak = np.random.uniform(0.1*self.L, 0.9*self.L)
         x0 = 5*np.exp(-(self.x_points - firstpeak)**2 / (2 * self.sigma**2))
         x0 += 5*np.exp(-(self.x_points - secondpeak+2)**2 / (2 * self.sigma**2))
         

@@ -429,12 +429,12 @@ class Heat(Dynamics):
         self.sigma = 100/15
 
     def set_input_mask(self):
-        self.first_input = np.random.uniform(0.1*self.L, 0.4*self.L)                        # location of first input
-        self.second_input = np.random.uniform(0.6*self.L, 0.9*self.L)                       # location of second input
+        self.first_input = np.random.uniform(0.1*self.L, 0.9*self.L)                        # location of first input
+        self.second_input = np.random.uniform(0.1*self.L, 0.9*self.L)                       # location of second input
         self.b_1 = np.exp(-(self.locations -self.first_input)**2 / (2 * self.sigma**2))     # gaussian mask first input
         self.b_2 = np.exp(-(self.locations -self.second_input)**2 / (2 * self.sigma**2))    # gaussian mask second input
         self.input_mask = np.column_stack((self.b_1, self.b_2))                             # combine them
-        
+
     def _dx(self,x,u):
 
         dt = self.alpha * (self.inv_x_step**2) * (np.roll(x, -1) - 2*x + np.roll(x, 1)) + self.input_mask @ u
