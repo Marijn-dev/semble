@@ -25,8 +25,8 @@ class TrajectorySampler:
                                 dynamics.default_initial_state())
 
         self._rng = np.random.default_rng()
-
         self._init_time = 0.
+
 
     def dims(self):
         return self._dyn.dims()
@@ -37,8 +37,8 @@ class TrajectorySampler:
         self._rng = np.random.default_rng()
 
     def get_example(self, time_horizon, n_samples):
+        self._dyn.set_input_mask()
         y0 = self.state_generator.sample()
-
         control_seq = self._seq_gen.sample(time_range=(self._init_time,
                                                        time_horizon),
                                            delta=self._delta)
@@ -64,7 +64,7 @@ class TrajectorySampler:
         y = traj.y.T
         t = traj.t.reshape(-1, 1)
 
-        return y0, t, y, control_seq
+        return y0, t, y, control_seq 
 
 
 def lhs(n_samples, rng):
