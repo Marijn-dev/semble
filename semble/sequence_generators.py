@@ -169,7 +169,44 @@ class SinusoidalSequence(SequenceGenerator):
         return (amplitude * np.sin(np.pi * frequency / delta * time)).reshape(
             (-1, 1))
 
+class Gaussian1D(SequenceGenerator):
+    '''input used for the amari model, contains several guassians'''
+    def __init__(self,x_lim,dx,max_duration):
+        self.x_lim = x_lim
+        self.dx = dx
+        self.x = np.arange(0,x_lim+dx,dx)
+        self.max_duration = max_duration # measured in deltas
+        
+    def _sample_impl(self,time_range,delta):
+        n_control_vals = int(1+np.floor((time_range[1] - time_range[0]) / delta))
+        control_seq = np.zeros([n_control_vals, len(self.x)])
 
+        durations = []
+        onsets = []
+        i = 0
+        onsets.append(np.random.randint(1,5))
+        
+        # while in time
+        while ((onsets[i]+self.max_duration)*delta) < time_range[1]:
+            durations.append(np.random.randint(int(self.max_duration/5),self.max_duration))
+            difference = np.random.randint(1,5) # delta difference between inputs
+            onsets.append(onsets[i]+durations[i]+difference)
+            i += 1
+        
+        onsets.pop() # remove last value since new signal doesnt fit anymore
+        onsets = np.array(onsets)
+        durations = np.array(durations)
+
+        amplitudes = np.random.uniform(1.5, 3.5, len(onsets)) 
+        sigmas = np.random.uniform(0.1, 0.5, len(onsets)) 
+        positions = np.random.uniform(self.x_lim/10,self.x_lim*0.9, len(onsets)) 
+        
+        # combine n guassians
+        for i in range(0,len(onsets)):
+            control_seq[onsets[i]:onsets[i]+int(durations[i]),:] = amplitudes[i] * np.exp(-0.5 * (self.x - positions[i]) ** 2 / sigmas[i] ** 2)
+
+        return control_seq
+    
 _seqgen_names = {
     "GaussianSequence": GaussianSequence,
     "UniformSqWave": UniformSqWave,
@@ -177,6 +214,7 @@ _seqgen_names = {
     "LogNormalSqWave": LogNormalSqWave,
     "RandomWalkSequence": RandomWalkSequence,
     "SinusoidalSequence": SinusoidalSequence,
+    "Gaussian1D": Gaussian1D,
 }
 
 

@@ -129,6 +129,18 @@ class HeatInitialState(InitialStateGenerator):
         
         return x0
 
+class AmariInitialState(InitialStateGenerator):
+    def __init__(self,x_lim,dx,rng: np.random.Generator = None):
+        '''returns empty array'''
+        super().__init__(rng)
+        self.n = int(np.round(x_lim/dx)) + 1
+
+    def _sample_impl(self):
+        x0 = np.zeros(self.n)
+        return x0
+        
+
+
 
 _initstategen_names = {
     "GaussianInitialState": GaussianInitialState,
@@ -140,6 +152,7 @@ _initstategen_names = {
     "HHFBEInitialState": HHFBEInitialState,
     "GreenshieldsInitialState": GreenshieldsInitialState,
     "HeatInitialState": HeatInitialState,
+    "AmariInitialState": AmariInitialState,
 }
 
 

@@ -426,17 +426,21 @@ class Heat(Dynamics):
         self.alpha = alpha # thermal diffusivity  [cm^2/s]
         self.inv_x_step = 1/ (self.L/(n-1)) # 1/delta_x
         self.locations = np.linspace(0, L, n)
+        self.locations_orig = np.linspace(0, 100, 50)
         self.sigma = 100/15
 
     def set_input_mask(self):
         self.first_input = np.random.uniform(0.1*self.L, 0.9*self.L)                        # location of first input
         self.second_input = np.random.uniform(0.1*self.L, 0.9*self.L)                       # location of second input
         self.b_1 = np.exp(-(self.locations -self.first_input)**2 / (2 * self.sigma**2))     # gaussian mask first input
+        self.b_1_orig = np.exp(-(self.locations_orig -self.first_input)**2 / (2 * self.sigma**2))     # gaussian mask first input
         self.b_2 = np.exp(-(self.locations -self.second_input)**2 / (2 * self.sigma**2))    # gaussian mask second input
+        self.b_2_orig = np.exp(-(self.locations_orig -self.second_input)**2 / (2 * self.sigma**2))    # gaussian mask second input
         self.input_mask = np.column_stack((self.b_1, self.b_2))                             # combine them
+        self.input_mask_orig = np.column_stack((self.b_1_orig, self.b_2_orig))                             # combine them
 
     def _dx(self,x,u):
-
+        a = self.alpha * (self.inv_x_step**2) * (np.roll(x, -1) - 2*x + np.roll(x, 1))
         dt = self.alpha * (self.inv_x_step**2) * (np.roll(x, -1) - 2*x + np.roll(x, 1)) + self.input_mask @ u
 
         # Neuman boundary conditions, comment if you don't want them to be enforced
@@ -444,7 +448,51 @@ class Heat(Dynamics):
         # dt[-1] = self.alpha * (self.inv_x_step**2) * 2*(x[-2]-x[-1])
 
         return dt
+    
+class Amari(Dynamics):
+    def __init__(self,x_lim,dx,theta,kernel_type,kernel_pars):
+        '''Amari, S. I. (1977). Dynamics of pattern formation in lateral-inhibition type neural fields. Biological Cybernetics, 27(2), 77-87,'
+        'implementation based on: https://github.com/w-wojtak/neural-fields-python?tab=readme-ov-file#1'''
 
+        super().__init__(int(np.round(x_lim/dx))+1, int(np.round(x_lim/dx)) +1)
+        self._method = "SM" # Spectral method, uses FFT-based convolutions
+
+        self.x_lim = x_lim
+        self.dx = dx
+        self.theta = theta
+        self.x = np.arange(0,x_lim+dx,dx)
+        self.locations = self.x
+        if kernel_type == 0:
+            self.w_hat = np.fft.fft(self.kernel_gauss(self.x, *kernel_pars))
+        elif kernel_type == 1:
+            self.w_hat = np.fft.fft(self.kernel_mex(self.x, *kernel_pars))
+        elif kernel_type == 2:
+            self.w_hat = np.fft.fft(self.kernel_osc(self.x, *kernel_pars))
+
+    def kernel_mex(self,x, a_ex, s_ex, a_in, s_in, w_in):
+        return a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - a_in * np.exp(-0.5 * x ** 2 / s_in ** 2) - w_in
+
+
+    def kernel_gauss(self,x, a_ex, s_ex, w_in):
+        return a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - w_in
+
+
+    def kernel_osc(self,x, a, b, alpha):
+        return a * (np.exp(-b*abs(x)) * ((b * np.sin(abs(alpha*x)))+np.cos(alpha*x)))
+
+    def simulate(self,u0,inputs,n_samples,time_horizon,init_time):
+
+        dt = (time_horizon-init_time)/inputs.shape[0]
+        t = np.arange(init_time,time_horizon,dt)
+        history_u = np.zeros([len(t), len(self.x)])
+        u_field = u0
+        for i in range(0, len(t)):
+            f_hat = np.fft.fft(np.heaviside(u_field - self.theta, 1))
+            conv = self.dx * np.fft.ifftshift(np.real(np.fft.ifft(f_hat * self.w_hat)))
+            u_field = u_field + dt * (-u_field + conv + inputs[i, :])
+            history_u[i, :] = u_field
+        
+        return history_u, t
 
 _dynamics_names = {
     "LinearSys": LinearSys,
@@ -459,6 +507,7 @@ _dynamics_names = {
     "GreenshieldsTraffic": GreenshieldsTraffic,
     "TwoTank": TwoTank,
     "Heat": Heat,
+    "Amari":Amari,
 }
 
 

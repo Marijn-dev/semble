@@ -27,6 +27,9 @@ class TrajectorySampler:
         self._rng = np.random.default_rng()
         self._init_time = 0.
 
+        self.x0_scaler = None
+        self.y_scaler = None
+        self.u_scaler = None
 
     def dims(self):
         return self._dyn.dims()
@@ -37,34 +40,42 @@ class TrajectorySampler:
         self._rng = np.random.default_rng()
 
     def get_example(self, time_horizon, n_samples):
-        self._dyn.set_input_mask()
+        ### Returns a trajectory ###
         y0 = self.state_generator.sample()
-        control_seq = self._seq_gen.sample(time_range=(self._init_time,
-                                                       time_horizon),
-                                           delta=self._delta)
+        if self._ode_method == "SM": # spectral method
+            control_seq = self._seq_gen.sample(time_range=(self._init_time,
+                                                        time_horizon),
+                                            delta=self._delta)
+            y, t = self._dyn.simulate(y0,control_seq,n_samples,time_horizon,self._init_time)
+        else: 
+            # self._dyn.set_input_mask()
 
-        def f(t, y):
-            n_control = int(np.floor((t - self._init_time) / self._delta))
-            u = control_seq[n_control]  # get u(t)
+            control_seq = self._seq_gen.sample(time_range=(self._init_time,
+                                                        time_horizon),
+                                            delta=self._delta)
 
-            return self._dyn(y, u)
+            def f(t, y):
+                n_control = int(np.floor((t - self._init_time) / self._delta))
+                u = control_seq[n_control]  # get u(t)
+                
+                return self._dyn(y, u)
 
-        t_samples = self._init_time + (time_horizon - self._init_time) * lhs(
-            n_samples, self._rng)
-        t_samples = np.sort(np.append(t_samples, [self._init_time]))
+            t_samples = self._init_time + (time_horizon - self._init_time) * lhs(
+                n_samples, self._rng)
+            t_samples = np.sort(np.append(t_samples, [self._init_time]))
 
-        traj = solve_ivp(
-            f,
-            (self._init_time, time_horizon),
-            y0,
-            t_eval=t_samples,
-            method=self._ode_method,
-        )
+            traj = solve_ivp(
+                f,
+                (self._init_time, time_horizon),
+                y0,
+                t_eval=t_samples,
+                method=self._ode_method,
+            )
 
-        y = traj.y.T
-        t = traj.t.reshape(-1, 1)
+            y = traj.y.T
+            t = traj.t.reshape(-1, 1)
 
-        return y0, t, y, control_seq 
+        return y0, t, y, control_seq
 
 
 def lhs(n_samples, rng):
