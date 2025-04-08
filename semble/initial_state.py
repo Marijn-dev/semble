@@ -139,8 +139,18 @@ class AmariInitialState(InitialStateGenerator):
         x0 = np.zeros(self.n)
         return x0
         
-
-
+class AmariCoupledInitialState(InitialStateGenerator):
+    def __init__(self,x_lim,dx,theta,rng: np.random.Generator = None):
+        '''returns empty array'''
+        super().__init__(rng)
+        self.n = int(np.round(x_lim/dx)) + 1
+        self.theta = theta
+        
+    def _sample_impl(self):
+        u0 = -self.theta*np.ones(self.n)
+        K = 0
+        v0 = K - u0
+        return np.stack((u0,v0),axis=-1)
 
 _initstategen_names = {
     "GaussianInitialState": GaussianInitialState,
@@ -153,6 +163,7 @@ _initstategen_names = {
     "GreenshieldsInitialState": GreenshieldsInitialState,
     "HeatInitialState": HeatInitialState,
     "AmariInitialState": AmariInitialState,
+    "AmariCoupledInitialState":AmariCoupledInitialState,
 }
 
 

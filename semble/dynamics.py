@@ -8,7 +8,8 @@ class Dynamics:
         self.n = state_dim
         self.m = control_dim
 
-        self.mask = mask if mask is not None else self.n * (1, )
+        # self.mask = mask if mask is not None else self.n * (1, )
+        self.mask = mask if mask is not None else np.ones(self.n)
         self.p = sum(self.mask)
         self.input_mask = None
         self.locations = None
@@ -454,7 +455,7 @@ class Amari(Dynamics):
         '''Amari, S. I. (1977). Dynamics of pattern formation in lateral-inhibition type neural fields. Biological Cybernetics, 27(2), 77-87,'
         'implementation based on: https://github.com/w-wojtak/neural-fields-python?tab=readme-ov-file#1'''
 
-        super().__init__(int(np.round(x_lim/dx))+1, int(np.round(x_lim/dx)) +1)
+        super().__init__((int(np.round(x_lim/dx))+1,), int(np.round(x_lim/dx)) +1)
         self._method = "SM" # Spectral method, uses FFT-based convolutions
 
         self.x_lim = x_lim
@@ -468,17 +469,20 @@ class Amari(Dynamics):
             self.w_hat = np.fft.fft(self.kernel_mex(self.x, *kernel_pars))
         elif kernel_type == 2:
             self.w_hat = np.fft.fft(self.kernel_osc(self.x, *kernel_pars))
+        elif kernel_type == 3:
+            self.w_hat = np.fft.fft(self.kernel_cos(self.x, *kernel_pars))
 
     def kernel_mex(self,x, a_ex, s_ex, a_in, s_in, w_in):
         return a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - a_in * np.exp(-0.5 * x ** 2 / s_in ** 2) - w_in
 
-
     def kernel_gauss(self,x, a_ex, s_ex, w_in):
         return a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - w_in
 
-
     def kernel_osc(self,x, a, b, alpha):
         return a * (np.exp(-b*abs(x)) * ((b * np.sin(abs(alpha*x)))+np.cos(alpha*x)))
+
+    def kernel_cos(self, x,A_1,A_2,a_1,a_2):
+        return (A_1*np.exp(-a_1* x ** 2 ) - A_2*np.exp(-a_2 * x ** 2)) * np.cos(x/2)
 
     def simulate(self,u0,inputs,n_samples,time_horizon,init_time):
 
@@ -494,6 +498,97 @@ class Amari(Dynamics):
         
         return history_u, t
 
+class AmariCoupled(Dynamics):
+    def __init__(self,x_lim,dx,theta,kernel_types,kernel_pars,diffusion,advection):
+        '''Two field Amari, S. I. (1977). Dynamics of pattern formation in lateral-inhibition type neural fields. Biological Cybernetics, 27(2), 77-87,'
+        'implementation based on: https://github.com/w-wojtak/neural-fields-python?tab=readme-ov-file#1'''
+
+        super().__init__((int(np.round(x_lim/dx))+1,2), int(np.round(x_lim/dx)) +1)
+        self._method = "SM" # Spectral method, uses FFT-based convolutions
+        self.x_lim = x_lim
+        self.dx = dx
+        self.theta = theta
+        self.x = np.arange(0,x_lim+dx,dx)
+        self.locations = self.x
+        self.beta = 2000
+        self.tau_v = 5 # change 
+        self.tau_u = self.tau_v/5 # change 
+        self.diffusion = bool(diffusion)
+        self.advection = bool(advection)
+        self.w_hat = []
+
+        # kernels for u and v
+        for (kernel_type,kernel_par) in zip(kernel_types,kernel_pars):
+            if kernel_type == 0:
+                self.w_hat.append(np.fft.fft(self.kernel_gauss(self.x, *kernel_par)))
+            elif kernel_type == 1:
+                self.w_hat.append(np.fft.fft(self.kernel_mex(self.x, *kernel_par)))
+            elif kernel_type == 2:
+                self.w_hat.append(np.fft.fft(self.kernel_osc(self.x, *kernel_par)))
+            elif kernel_type == 3:
+                self.w_hat.append(np.fft.fft(self.kernel_cos(self.x, *kernel_par)))
+
+    def kernel_mex(self,x, a_ex, s_ex, a_in, s_in, w_in):
+        return a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - a_in * np.exp(-0.5 * x ** 2 / s_in ** 2) - w_in
+
+    def kernel_gauss(self,x, a_ex, s_ex, w_in):
+        return a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - w_in
+
+    def kernel_osc(self,x, a, b, alpha):
+        return a * (np.exp(-b*abs(x)) * ((b * np.sin(abs(alpha*x)))+np.cos(alpha*x)))
+    
+    def kernel_cos(self, x,A_1,A_2,a_1,a_2):
+        return (A_1*np.exp(-a_1* x ** 2 ) - A_2*np.exp(-a_2 * x ** 2)) * np.cos(x/2)
+
+    def sigmoid(self,x, beta,theta):
+        return 1 / (1 + np.exp(-beta * (x - theta)))
+
+    def simulate(self,x0,inputs,n_samples,time_horizon,init_time):
+
+        dt = (time_horizon-init_time)/inputs.shape[0]
+        t = np.arange(init_time,time_horizon,dt)
+        history_u = np.zeros([len(t), len(self.x)])
+        history_v = np.zeros([len(t), len(self.x)])
+
+        # IC
+        u_field = x0[:,0]
+        v_field = x0[:,1]
+
+        
+        k = np.fft.fftfreq(len(self.x), self.dx) * 2 * np.pi  # Wave numbers in Fourier space
+
+        u_field_full = []
+        v_field_full = []
+        for i in range(0, len(t)):
+            f_hat = self.sigmoid(u_field, self.beta, self.theta)
+            conv_u = self.dx * np.fft.ifftshift(np.real(np.fft.ifft(f_hat * self.w_hat[0])))
+            conv_v = self.dx * np.fft.ifftshift(np.real(np.fft.ifft(f_hat * self.w_hat[1])))
+
+            # Compute the second derivative of v using the Fourier domain representation
+            v_hat = np.fft.fft(v_field)  # Fourier transform of v_field
+            u_hat = np.fft.fft(u_field)  # Fourier transform of v_field
+            if self.advection:
+                advection_term = np.real(np.fft.ifft(1j *k* v_hat))  # Multiply by k^2 for the second derivative in Fourier space
+            else:
+                advection_term = 0
+
+            if self.diffusion:
+                diffusion_term = np.real(np.fft.ifft(-k**2 * v_hat))  # Multiply by k^2 for the second derivative in Fourier space
+            else:
+                diffusion_term = 0
+          
+            
+
+            u_field += dt /self.tau_u * (-u_field + conv_u + v_field + inputs[i, :])
+            u_field_full.append(u_field)
+            v_field += dt / self.tau_v * (-v_field - conv_v + u_field  + 10**-3 * diffusion_term + 10**-2 *v_field*advection_term)
+            v_field_full.append(v_field)
+            history_u[i, :] = u_field
+            history_v[i, :] = v_field
+        
+        return np.stack((history_u,history_v),axis=-1), t
+
+
 _dynamics_names = {
     "LinearSys": LinearSys,
     "VanDerPol": VanDerPol,
@@ -508,6 +603,7 @@ _dynamics_names = {
     "TwoTank": TwoTank,
     "Heat": Heat,
     "Amari":Amari,
+    "AmariCoupled":AmariCoupled,
 }
 
 

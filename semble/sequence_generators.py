@@ -197,8 +197,8 @@ class Gaussian1D(SequenceGenerator):
         onsets = np.array(onsets)
         durations = np.array(durations)
 
-        amplitudes = np.random.uniform(1.5, 3.5, len(onsets)) 
-        sigmas = np.random.uniform(0.1, 0.5, len(onsets)) 
+        amplitudes = np.random.uniform(2.5, 4.5, len(onsets)) 
+        sigmas = np.random.uniform(0.7, 1.3, len(onsets)) 
         positions = np.random.uniform(self.x_lim/10,self.x_lim*0.9, len(onsets)) 
         
         # combine n guassians
