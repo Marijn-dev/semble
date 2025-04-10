@@ -499,7 +499,7 @@ class Amari(Dynamics):
         return history_u, t
 
 class AmariCoupled(Dynamics):
-    def __init__(self,x_lim,dx,theta,kernel_types,kernel_pars,diffusion,advection):
+    def __init__(self,x_lim,dx,theta,beta,tau_u,tau_v,kernel_types,kernel_pars,diffusion,diffusion_coeff,advection,advection_coeff):
         '''Two field Amari, S. I. (1977). Dynamics of pattern formation in lateral-inhibition type neural fields. Biological Cybernetics, 27(2), 77-87,'
         'implementation based on: https://github.com/w-wojtak/neural-fields-python?tab=readme-ov-file#1'''
 
@@ -510,11 +510,13 @@ class AmariCoupled(Dynamics):
         self.theta = theta
         self.x = np.arange(0,x_lim+dx,dx)
         self.locations = self.x
-        self.beta = 2000
-        self.tau_v = 5 # change 
-        self.tau_u = self.tau_v/5 # change 
+        self.beta = beta
+        self.tau_u = tau_u 
+        self.tau_v = tau_v
         self.diffusion = bool(diffusion)
+        self.diffusion_coeff = diffusion_coeff
         self.advection = bool(advection)
+        self.advection_coeff = advection_coeff
         self.w_hat = []
 
         # kernels for u and v
@@ -559,21 +561,42 @@ class AmariCoupled(Dynamics):
 
         u_field_full = []
         v_field_full = []
+
+        def finite_diff_advection(v, dx):
+            # Apply zero boundary conditions for advection
+            v_copy = np.copy(v)
+            # v_copy[0] = 0   # Left boundary = 0
+            # v_copy[-1] = 0  # Right boundary = 0
+            # v_copy[0] = 0.15 * v_copy[1] + 0.7 * v_copy[2] + 0.15 * v_copy[3]
+            # v_copy[-1] = 0.15 * v_copy[-2] + 0.7 * v_copy[-3] + 0.15 * v_copy[-4]
+            return (np.roll(v_copy, -1) - np.roll(v_copy, 1)) / (2 * dx)
+
+        def finite_diff_diffusion(v, dx):
+            # Apply zero boundary conditions for diffusion
+            v_copy = np.copy(v)
+            # v_copy[0] = 0   # Left boundary = 0
+            # v_copy[-1] = 0  # Right boundary = 0
+            return (np.roll(v_copy, -1) - 2*v_copy + np.roll(v_copy, 1)) / (dx**2)
+
+
         for i in range(0, len(t)):
-            f_hat = self.sigmoid(u_field, self.beta, self.theta)
-            conv_u = self.dx * np.fft.ifftshift(np.real(np.fft.ifft(f_hat * self.w_hat[0])))
-            conv_v = self.dx * np.fft.ifftshift(np.real(np.fft.ifft(f_hat * self.w_hat[1])))
+            f_hat_u = self.sigmoid(u_field, self.beta, self.theta)
+            f_hat_v = self.sigmoid(v_field, self.beta, self.theta)
+            conv_u = self.dx * np.fft.ifftshift(np.real(np.fft.ifft(f_hat_u * self.w_hat[0])))
+            conv_v = self.dx * np.fft.ifftshift(np.real(np.fft.ifft(f_hat_u * self.w_hat[1])))
 
             # Compute the second derivative of v using the Fourier domain representation
             v_hat = np.fft.fft(v_field)  # Fourier transform of v_field
             u_hat = np.fft.fft(u_field)  # Fourier transform of v_field
             if self.advection:
-                advection_term = np.real(np.fft.ifft(1j *k* v_hat))  # Multiply by k^2 for the second derivative in Fourier space
+                # advection_term = np.real(np.fft.ifft(1j *k* v_hat))  # Multiply by k^2 for the second derivative in Fourier space
+                advection_term = finite_diff_advection(v_field, self.dx)
             else:
                 advection_term = 0
 
             if self.diffusion:
-                diffusion_term = np.real(np.fft.ifft(-k**2 * v_hat))  # Multiply by k^2 for the second derivative in Fourier space
+                # diffusion_term = np.real(np.fft.ifft(-k**2 * v_hat))  # Multiply by k^2 for the second derivative in Fourier space
+                diffusion_term = finite_diff_diffusion(v_field, self.dx)
             else:
                 diffusion_term = 0
           
@@ -581,13 +604,92 @@ class AmariCoupled(Dynamics):
 
             u_field += dt /self.tau_u * (-u_field + conv_u + v_field + inputs[i, :])
             u_field_full.append(u_field)
-            v_field += dt / self.tau_v * (-v_field - conv_v + u_field  + 10**-3 * diffusion_term + 10**-2 *v_field*advection_term)
+            v_field += dt / self.tau_v * (-v_field - conv_v + u_field  + self.diffusion_coeff * diffusion_term + self.advection_coeff *v_field*advection_term)
             v_field_full.append(v_field)
             history_u[i, :] = u_field
             history_v[i, :] = v_field
         
         return np.stack((history_u,history_v),axis=-1), t
 
+class AmariCoupledFHN(Dynamics):
+    def __init__(self,x_lim,dx,theta,eps,a,b,beta,tau_u,tau_v,kernel_types,kernel_pars):
+        '''Two field Amari, S. I. (1977). Dynamics of pattern formation in lateral-inhibition type neural fields. Biological Cybernetics, 27(2), 77-87,'
+        'implementation based on: https://github.com/w-wojtak/neural-fields-python?tab=readme-ov-file#1'''
+
+        super().__init__((int(np.round(x_lim/dx))+1,2), int(np.round(x_lim/dx)) +1)
+        self._method = "SM" # Spectral method, uses FFT-based convolutions
+        self.x_lim = x_lim
+        self.dx = dx
+        self.theta = theta
+        self.x = np.arange(0,x_lim+dx,dx)
+        self.locations = self.x
+        self.beta = beta
+        self.tau_u = tau_u 
+        self.tau_v = tau_v
+        self.eps = eps
+        self.a = a
+        self.b = b
+        self.w_hat = []
+
+        # kernels for u and v
+        for (kernel_type,kernel_par) in zip(kernel_types,kernel_pars):
+            if kernel_type == 0:
+                self.w_hat.append(np.fft.fft(self.kernel_gauss(self.x, *kernel_par)))
+            elif kernel_type == 1:
+                self.w_hat.append(np.fft.fft(self.kernel_mex(self.x, *kernel_par)))
+            elif kernel_type == 2:
+                self.w_hat.append(np.fft.fft(self.kernel_osc(self.x, *kernel_par)))
+            elif kernel_type == 3:
+                self.w_hat.append(np.fft.fft(self.kernel_cos(self.x, *kernel_par)))
+
+    def kernel_mex(self,x, a_ex, s_ex, a_in, s_in, w_in):
+        return a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - a_in * np.exp(-0.5 * x ** 2 / s_in ** 2) - w_in
+
+    def kernel_gauss(self,x, a_ex, s_ex, w_in):
+        return a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - w_in
+
+    def kernel_osc(self,x, a, b, alpha):
+        return a * (np.exp(-b*abs(x)) * ((b * np.sin(abs(alpha*x)))+np.cos(alpha*x)))
+    
+    def kernel_cos(self, x,A_1,A_2,a_1,a_2):
+        return (A_1*np.exp(-a_1* x ** 2 ) - A_2*np.exp(-a_2 * x ** 2)) * np.cos(x/2)
+
+    def sigmoid(self,x, beta,theta):
+        return 1 / (1 + np.exp(-beta * (x - theta)))
+
+    def simulate(self,x0,inputs,n_samples,time_horizon,init_time):
+
+        dt = (time_horizon-init_time)/inputs.shape[0]
+        t = np.arange(init_time,time_horizon,dt)
+        history_u = np.zeros([len(t), len(self.x)])
+        history_v = np.zeros([len(t), len(self.x)])
+
+        # IC
+        u_field = x0[:,0]
+        v_field = x0[:,1]
+
+
+        u_field_full = []
+        v_field_full = []
+        
+        for i in range(0, len(t)):
+            f_hat_u = self.sigmoid(u_field, self.beta, self.theta)
+            f_hat_v = self.sigmoid(v_field, self.beta, self.theta)
+            self.w_hat[0] *= 0.5  # Reduce kernel strength for coupling u
+            self.w_hat[1] *= 0.5  # Reduce kernel strength for coupling v
+            conv_uu = self.dx * np.fft.ifftshift(np.real(np.fft.ifft(f_hat_u * self.w_hat[0])))
+            conv_uv = self.dx * np.fft.ifftshift(np.real(np.fft.ifft(f_hat_v * self.w_hat[1])))
+            conv_vu = self.dx * np.fft.ifftshift(np.real(np.fft.ifft(f_hat_u * self.w_hat[1])))
+            conv_vu *= 0.1  # Reduce the interaction strength
+
+            u_field += dt /self.tau_u * (u_field - (1/3)*u_field**3 - v_field + conv_uu + inputs[i, :])
+            u_field_full.append(u_field)
+            v_field += (dt / self.tau_v) * self.eps * (u_field + self.a - self.b*v_field + conv_vu)
+            v_field_full.append(v_field)
+            history_u[i, :] = u_field
+            history_v[i, :] = v_field
+        
+        return np.stack((history_u,history_v),axis=-1), t
 
 _dynamics_names = {
     "LinearSys": LinearSys,
@@ -604,6 +706,7 @@ _dynamics_names = {
     "Heat": Heat,
     "Amari":Amari,
     "AmariCoupled":AmariCoupled,
+    "AmariCoupledFHN":AmariCoupledFHN,
 }
 
 

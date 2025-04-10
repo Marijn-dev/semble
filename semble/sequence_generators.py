@@ -171,11 +171,14 @@ class SinusoidalSequence(SequenceGenerator):
 
 class Gaussian1D(SequenceGenerator):
     '''input used for the amari model, contains several guassians'''
-    def __init__(self,x_lim,dx,max_duration):
+    def __init__(self,x_lim,dx,duration,amplitude,std,difference):
         self.x_lim = x_lim
         self.dx = dx
         self.x = np.arange(0,x_lim+dx,dx)
-        self.max_duration = max_duration # measured in deltas
+        self.duration = duration # measured in deltas
+        self.amplitude = amplitude
+        self.std = std
+        self.difference = difference
         
     def _sample_impl(self,time_range,delta):
         n_control_vals = int(1+np.floor((time_range[1] - time_range[0]) / delta))
@@ -187,9 +190,9 @@ class Gaussian1D(SequenceGenerator):
         onsets.append(np.random.randint(1,5))
         
         # while in time
-        while ((onsets[i]+self.max_duration)*delta) < time_range[1]:
-            durations.append(np.random.randint(int(self.max_duration/5),self.max_duration))
-            difference = np.random.randint(1,5) # delta difference between inputs
+        while ((onsets[i]+self.duration[1])*delta) < time_range[1]:
+            durations.append(np.random.randint(int(self.duration[0]),int(self.duration[1])))
+            difference = np.random.randint(self.difference[0],self.difference[1]) # delta difference between inputs
             onsets.append(onsets[i]+durations[i]+difference)
             i += 1
         
@@ -197,9 +200,9 @@ class Gaussian1D(SequenceGenerator):
         onsets = np.array(onsets)
         durations = np.array(durations)
 
-        amplitudes = np.random.uniform(2.5, 4.5, len(onsets)) 
-        sigmas = np.random.uniform(0.7, 1.3, len(onsets)) 
-        positions = np.random.uniform(self.x_lim/10,self.x_lim*0.9, len(onsets)) 
+        amplitudes = np.random.uniform(self.amplitude[0], self.amplitude[1], len(onsets)) 
+        sigmas = np.random.uniform(self.std[0], self.std[1], len(onsets)) 
+        positions = np.random.uniform(self.x_lim*0.1,self.x_lim*0.9, len(onsets)) 
         
         # combine n guassians
         for i in range(0,len(onsets)):
