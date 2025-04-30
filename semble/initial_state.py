@@ -133,10 +133,17 @@ class AmariInitialState(InitialStateGenerator):
     def __init__(self,x_lim,dx,rng: np.random.Generator = None):
         '''returns empty array'''
         super().__init__(rng)
-        self.n = int(np.round(x_lim/dx)) + 1
+        self.n = int(np.round(x_lim/dx)) * 2+1
+        self.x = np.arange(-x_lim,x_lim+dx,dx)
 
     def _sample_impl(self):
-        x0 = np.zeros(self.n)
+        # x0 = np.zeros(self.n)
+        x0 = 0.3 * np.exp(-(self.x**2) / (0.05**2))  # Small bump in center
+        x0 = 0.05 * np.random.randn(self.n)  # Small random fluctuations
+        x0 = 1.5 * np.exp(-(self.x**2) / (1**2))  # above threshold
+        x0 += 1.5*np.exp(-(self.x - self.x[-1])**2 / 0.01)  # bump near edge
+        x0 += 1.5*np.exp(-(self.x - self.x[0])**2 / 0.01)  # bump near edge
+
         return x0
         
 class AmariCoupledInitialState(InitialStateGenerator):
@@ -165,6 +172,19 @@ class AmariCoupledFHNInitialState(InitialStateGenerator):
         v0 = K - u0
         return np.stack((u0,v0),axis=-1)
 
+class LifInitialState(InitialStateGenerator):
+    def __init__(self,bumps,N,rng:np.random.Generator = None):
+        '''returns empty array'''
+        super().__init__(rng)
+        self.N = N
+        self.bumps = bumps
+
+
+    def _sample_impl(self):
+        v0 = 0.85 * np.exp(-0.5 * ((np.arange(self.N) - 30) / 10)**2)
+        v0 += 0.85 * np.exp(-0.5 * ((np.arange(self.N) - 90) / 10)**2)
+        return v0
+    
 _initstategen_names = {
     "GaussianInitialState": GaussianInitialState,
     "UniformInitialState": UniformInitialState,
@@ -178,7 +198,7 @@ _initstategen_names = {
     "AmariInitialState": AmariInitialState,
     "AmariCoupledInitialState":AmariCoupledInitialState,
     "AmariCoupledFHNInitialState":AmariCoupledFHNInitialState,
-
+    "LifInitialState": LifInitialState,
 }
 
 

@@ -47,6 +47,13 @@ class TrajectorySampler:
                                                         time_horizon),
                                             delta=self._delta)
             y, t = self._dyn.simulate(y0,control_seq,n_samples,time_horizon,self._init_time)
+        elif self._ode_method == "Brian2":
+            control_seq = self._seq_gen.sample(time_range=(self._init_time,
+                                                        time_horizon),
+                                            delta=self._delta)
+            y, t = self._dyn.simulate(y0,control_seq,n_samples,time_horizon,self._init_time)
+            y = y.T
+            t = t.reshape(-1, 1)
         else: 
             # self._dyn.set_input_mask()
 
@@ -74,7 +81,6 @@ class TrajectorySampler:
 
             y = traj.y.T
             t = traj.t.reshape(-1, 1)
-
         return y0, t, y, control_seq
 
 

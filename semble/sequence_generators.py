@@ -1,5 +1,5 @@
 import numpy as np
-
+from brian2 import *
 
 class SequenceGenerator:
 
@@ -174,7 +174,7 @@ class Gaussian1D(SequenceGenerator):
     def __init__(self,x_lim,dx,duration,amplitude,std,difference):
         self.x_lim = x_lim
         self.dx = dx
-        self.x = np.arange(0,x_lim+dx,dx)
+        self.x = np.arange(-x_lim,x_lim+dx,dx)
         self.duration = duration # measured in deltas
         self.amplitude = amplitude
         self.std = std
@@ -202,13 +202,58 @@ class Gaussian1D(SequenceGenerator):
 
         amplitudes = np.random.uniform(self.amplitude[0], self.amplitude[1], len(onsets)) 
         sigmas = np.random.uniform(self.std[0], self.std[1], len(onsets)) 
-        positions = np.random.uniform(self.x_lim*0.1,self.x_lim*0.9, len(onsets)) 
+        positions = np.random.uniform(self.x[0]*0.9,self.x[-1]*0.9, len(onsets)) 
         
         # combine n guassians
         for i in range(0,len(onsets)):
             control_seq[onsets[i]:onsets[i]+int(durations[i]),:] = amplitudes[i] * np.exp(-0.5 * (self.x - positions[i]) ** 2 / sigmas[i] ** 2)
+            # control_seq
+        # np.zeros([n_control_vals, len(self.x)])
+        # return control_seq
+        return np.ones([n_control_vals, len(self.x)]) * 0
 
+class StepBrian(SequenceGenerator):
+    def __init__(self,magnitudes,period,dim,amplitude,std,rng=None):
+        super().__init__(dim, rng)
+        self.period = period
+        self._period = period
+        self._min, self._max = magnitudes
+        self.amplitude = amplitude
+        self.std = std
+
+    def _sample_impl(self,time_range,delta):
+        n_control_vals = int(1+np.floor((time_range[1] - time_range[0]) / delta))
+        n_amplitude_vals = int(np.ceil(n_control_vals / self._period))
+
+        step = True
+        guassian = False
+        if step:
+            mask_amp_seq = self._rng.uniform(low=self._min,
+                                high=self._max,
+                                size=(n_amplitude_vals, 1)) 
+            # Initialize a new array of zeros
+            amp_seq = np.zeros(shape=(n_amplitude_vals, self.dim))
+
+            # Select random starting positions for the 10-neuron segments
+            for i in range(n_amplitude_vals):
+                # Randomly choose a starting index for the 10-neuron segment
+                start_idx = numpy.random.randint(0, self.dim - 40)
+                start_idx = 0
+                # Set the 10 consecutive neurons to the original random value
+                amp_seq[i, start_idx:start_idx+100] = mask_amp_seq[i, 0]  # Use the random value from t
+        if guassian:
+            neuron_indices = np.arange(self.dim)
+            mu = numpy.random.randint(low=neuron_indices[0], high=neuron_indices[-1], size=n_amplitude_vals) # random neuron locations
+            amp_seq = np.zeros(shape=(n_amplitude_vals, self.dim))
+            for i,mean in enumerate(mu):
+                amp_seq[i] = self.amplitude * np.exp(-0.5 * ((neuron_indices - mean) ** 2) / self.std ** 2)
+
+        control_seq = np.repeat(amp_seq, self._period, axis=0)[:n_control_vals]
+        control_seq = np.ones((101,100)) * 1.1
+        # control_seq[:,20:30] = 1.1
+        # control_seq[:,70:80] = 1.1
         return control_seq
+
     
 _seqgen_names = {
     "GaussianSequence": GaussianSequence,
@@ -218,6 +263,7 @@ _seqgen_names = {
     "RandomWalkSequence": RandomWalkSequence,
     "SinusoidalSequence": SinusoidalSequence,
     "Gaussian1D": Gaussian1D,
+    "StepBrian": StepBrian,
 }
 
 

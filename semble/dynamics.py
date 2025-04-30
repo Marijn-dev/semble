@@ -1,6 +1,7 @@
 import numpy as np
 from . import initial_state
-
+from brian2 import *
+from .visualization import visualise_connectivity, heatmap_1D, plot_animate_1d, heatmap_1D_adj, heatmap_1D_adj_2
 
 class Dynamics:
 
@@ -455,22 +456,34 @@ class Amari(Dynamics):
         '''Amari, S. I. (1977). Dynamics of pattern formation in lateral-inhibition type neural fields. Biological Cybernetics, 27(2), 77-87,'
         'implementation based on: https://github.com/w-wojtak/neural-fields-python?tab=readme-ov-file#1'''
 
-        super().__init__((int(np.round(x_lim/dx))+1,), int(np.round(x_lim/dx)) +1)
+        super().__init__((int(np.round(x_lim/dx))*2+1,), int(np.round(x_lim/dx))*2+1)
         self._method = "SM" # Spectral method, uses FFT-based convolutions
 
         self.x_lim = x_lim
         self.dx = dx
         self.theta = theta
-        self.x = np.arange(0,x_lim+dx,dx)
+        self.x = np.arange(-x_lim,x_lim+dx,dx)
         self.locations = self.x
+        import matplotlib.pyplot as plt
         if kernel_type == 0:
             self.w_hat = np.fft.fft(self.kernel_gauss(self.x, *kernel_pars))
+            plt.plot(self.x,self.kernel_gauss(self.x, *kernel_pars))
+            print("Kernel integral:", np.sum(self.kernel_gauss(self.x, *kernel_pars) * dx))
         elif kernel_type == 1:
             self.w_hat = np.fft.fft(self.kernel_mex(self.x, *kernel_pars))
+            plt.plot(self.x,self.kernel_mex(self.x, *kernel_pars))
+            print("Kernel integral:", np.sum(self.kernel_mex(self.x, *kernel_pars) * dx))
         elif kernel_type == 2:
             self.w_hat = np.fft.fft(self.kernel_osc(self.x, *kernel_pars))
+            plt.plot(self.x,self.kernel_osc(self.x, *kernel_pars))
+            print("Kernel integral:", np.sum(self.kernel_osc(self.x, *kernel_pars) * dx))
         elif kernel_type == 3:
             self.w_hat = np.fft.fft(self.kernel_cos(self.x, *kernel_pars))
+            plt.plot(self.x,self.kernel_cos(self.x, *kernel_pars))
+            print("Kernel integral:", np.sum(self.kernel_cos(self.x, *kernel_pars) * dx))
+
+        plt.show()
+
 
     def kernel_mex(self,x, a_ex, s_ex, a_in, s_in, w_in):
         return a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - a_in * np.exp(-0.5 * x ** 2 / s_in ** 2) - w_in
@@ -484,6 +497,9 @@ class Amari(Dynamics):
     def kernel_cos(self, x,A_1,A_2,a_1,a_2):
         return (A_1*np.exp(-a_1* x ** 2 ) - A_2*np.exp(-a_2 * x ** 2)) * np.cos(x/2)
 
+    def sigmoid(self,x):
+            return 1 / (1 + np.exp(-100* (x - self.theta)))
+
     def simulate(self,u0,inputs,n_samples,time_horizon,init_time):
 
         dt = (time_horizon-init_time)/inputs.shape[0]
@@ -491,9 +507,13 @@ class Amari(Dynamics):
         history_u = np.zeros([len(t), len(self.x)])
         u_field = u0
         for i in range(0, len(t)):
-            f_hat = np.fft.fft(np.heaviside(u_field - self.theta, 1))
+            # f_hat = np.fft.fft(np.heaviside(u_field - self.theta, 1))
+            f_hat = np.fft.fft(self.sigmoid(u_field))
             conv = self.dx * np.fft.ifftshift(np.real(np.fft.ifft(f_hat * self.w_hat)))
-            u_field = u_field + dt * (-u_field + conv + inputs[i, :])
+            # print(f_hat)  
+            # print('i:', i   )
+            # print(conv)
+            u_field = u_field + (dt/0.5) * (-u_field + conv + inputs[i, :])
             history_u[i, :] = u_field
         
         return history_u, t
@@ -575,7 +595,7 @@ class AmariCoupled(Dynamics):
             # Apply zero boundary conditions for diffusion
             v_copy = np.copy(v)
             # v_copy[0] = 0   # Left boundary = 0
-            # v_copy[-1] = 0  # Right boundary = 0
+            # v_copy[-1] = 0  # Right boundary = 0a
             return (np.roll(v_copy, -1) - 2*v_copy + np.roll(v_copy, 1)) / (dx**2)
 
 
@@ -691,6 +711,109 @@ class AmariCoupledFHN(Dynamics):
         
         return np.stack((history_u,history_v),axis=-1), t
 
+
+class LIFBrian2(Dynamics):
+    def __init__(self,x_lim,tau,N,theta,refractory,reset_value, kernel_type,kernel_pars,delta):
+        '''Leaky Integrate and Fire (LIF) neuron model simulated using Brian2: https://brian2.readthedocs.io/en/stable/'''
+        super().__init__(N, N)
+        self._method = "Brian2" 
+        self.x_lim = x_lim * mm
+        self.N = N
+        self.theta = theta
+        self.refractory = refractory
+        self.reset_value = reset_value
+        self.kernel_type = kernel_type
+        self.kernel_pars = kernel_pars
+        self.delta = delta
+        neuron_spacing = self.x_lim / N
+        self.tau = tau * ms
+        self.eqs =  '''     
+                    dv/dt = (I-v)/tau : 1 (unless refractory)
+                    I = stimulus(t,i)    : 1 # i == neuron index
+                    x : metre
+                    '''
+        self.G = NeuronGroup(self.N,self.eqs, threshold='v>theta', refractory=self.refractory*ms,reset='v=reset_value', method='euler',namespace={
+        'tau': self.tau,
+        'theta': self.theta,
+        'reset_value': self.reset_value})
+
+        self.S = Synapses(self.G, self.G, """
+            w : 1
+             """,on_pre="v += w")
+        self.S.connect(condition='i!=j') # connect all to all except self to self
+
+        self.G.x = 'i*neuron_spacing' # create spatial locations for each neuron
+        self.locations = asarray(self.G.x) # locations of neurons in the network
+        
+        def guassian_kernel(x):
+            x = asarray(x)
+            scale, sigma = kernel_pars
+            return scale * np.exp(-0.5 * x ** 2 / sigma ** 2)
+        
+        def cosine_kernel(x):
+            x = asarray(x)
+            x_scaled = x / 0.01  # now x_scaled ∈ [0, 1]
+            x_scaled = (x - 0.01225 / 2) * (2 * np.pi / 0.01225)
+
+            scale,A1,A2,a1,a2 = kernel_pars
+            return   scale*(A1*np.exp(-a1* x_scaled ** 2 ) - A2*np.exp(-a2 * x_scaled ** 2)) * np.cos(x_scaled/2)
+        
+        def mexican_hat_kernel(x):
+            x = asarray(x)
+            x_scaled = (x - 0.006125) * (6 / 0.01225)  # Center and stretch
+            x_scaled = (x - 0.01225 / 2) * (20 / 0.01225)
+
+            scale,a_ex, s_ex, a_in, s_in, w_in = kernel_pars
+            kernel = a_ex * np.exp(-0.5 * x_scaled ** 2 / s_ex ** 2) - a_in * np.exp(-0.5 * x_scaled ** 2 / s_in ** 2) - w_in
+            kernel = kernel * scale
+            plt.figure(figsize=(8, 4))
+            plt.plot(x_scaled, kernel, label='Kernel')
+            plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+            plt.title('Difference-of-Gaussians Kernel')
+            plt.xlabel('Scaled Space (x ∈ [-10, 10])')
+            plt.ylabel('Weight')
+            plt.grid(True)
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            return kernel
+            
+        if kernel_type == 0:
+            self.kernel = guassian_kernel 
+        if kernel_type == 1:
+            self.kernel = mexican_hat_kernel
+        if kernel_type == 3:
+            self.kernel = cosine_kernel
+
+        diff = np.abs(self.G.x[self.S.i] - self.G.x[self.S.j])
+        diff_wrapped = np.minimum(diff, self.G.x[-1] - diff)
+        conduction_speed = 0.1*10*mm / ms
+        self.S.w[:] = self.kernel(diff_wrapped)
+        self.S.delay[:] = diff_wrapped / conduction_speed
+        # visualise_connectivity(self.S)
+
+        self.Statemon = StateMonitor(self.G, variables=True, record=True) # record
+        self.net = Network(self.G, self.S, self.Statemon)  # for simulation purposes
+        self.net.store('initial')  # Save initial state (e.g., before first simulate call)
+
+        
+    def simulate(self, x, u,n_samples,time_horizon,init_time):
+        self.net.restore('initial')
+        self.G.v = x # initial condition
+        stimulus = TimedArray(u, dt=self.delta*ms)
+        duration = (time_horizon - init_time) * ms 
+        self.net.run(duration)
+        # heatmap_1D_adj_2(self.Statemon.v,self.Statemon.I,self.G.x,self.Statemon.t)
+        # heatmap_1D(self.Statemon.v,self.Statemon.I)
+        # plot_animate_1d(self.Statemon.v,self.theta,self.Statemon.I)
+        y, t = asarray(self.Statemon.v), asarray(self.Statemon.t) * 1000 # convert from s to ms (asarray returns it in seconds)
+        return y, t
+
+
+
+
+
+
 _dynamics_names = {
     "LinearSys": LinearSys,
     "VanDerPol": VanDerPol,
@@ -707,6 +830,7 @@ _dynamics_names = {
     "Amari":Amari,
     "AmariCoupled":AmariCoupled,
     "AmariCoupledFHN":AmariCoupledFHN,
+    "LIFBrian2":LIFBrian2,
 }
 
 
