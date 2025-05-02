@@ -249,9 +249,16 @@ class StepBrian(SequenceGenerator):
                 amp_seq[i] = self.amplitude * np.exp(-0.5 * ((neuron_indices - mean) ** 2) / self.std ** 2)
 
         control_seq = np.repeat(amp_seq, self._period, axis=0)[:n_control_vals]
-        control_seq = np.ones((101,100)) * 1.1
-        # control_seq[:,20:30] = 1.1
-        # control_seq[:,70:80] = 1.1
+        control_seq = np.zeros((101,100)) * 1.0
+        # control_seq = np.ones((101,100)) * 1.1
+
+        control_seq[:,0:5] = 53.5
+        # control_seq[:,5:10] = 32.5
+        # control_seq[:,10:] = 10
+        # control_seq[:,25:35] = 1.5
+        # control_seq[:,75:85] = 1.1
+        # print(np.shape(control_seq))
+        control_seq[15:,:] = 0.0
         return control_seq
 
     

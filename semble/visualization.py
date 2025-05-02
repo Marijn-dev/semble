@@ -1,0 +1,215 @@
+from brian2 import *
+import matplotlib as mpl
+import numpy as np
+import matplotlib.pyplot as plt
+
+def visualise_connectivity(S):
+
+    ### Lines going from source to target ###
+    Ns = len(S.source)
+    Nt = len(S.target)
+    figure(figsize=(18, 4))
+    subplot(131)
+    plot(zeros(Ns), arange(Ns), 'ok', ms=10)
+    plot(ones(Nt), arange(Nt), 'ok', ms=10)
+    for i, j in zip(S.i, S.j):
+        plot([0, 1], [i, j], '-k')
+    xticks([0, 1], ['Source', 'Target'])
+    ylabel('Neuron index')
+    xlim(-0.1, 1.1)
+    ylim(-1, max(Ns, Nt))
+    title('connections lines')
+
+
+    ### Dot representing a connection ###
+    subplot(132)
+    plot(S.i, S.j, 'ok')
+    xlim(-1, Ns)
+    ylim(-1, Nt)
+    xlabel('Source neuron index')
+    ylabel('Target neuron index')
+    title('connections')
+    ### Size of dot representing the weight of the connection ###
+    subplot(133)
+    scatter(S.x_pre/um, S.x_post/um, S.w*0.5)
+    xlabel('Source neuron position (um)')
+    ylabel('Target neuron position (um)')
+    title('connections weigths')
+
+    plt.show()
+
+def heatmap_1D(data1, data2):
+    """
+    Plots heatmaps of data1 and data2 with neuron indices on the y-axis.
+
+    Parameters:
+    - data1: np.ndarray of shape (neurons, time)
+    - data2: np.ndarray of shape (neurons, time)
+    """
+    fig, axs = plt.subplots(1, 2, figsize=(14, 5))
+
+    # Plot first heatmap
+    im1 = axs[0].imshow(data1, aspect='auto', cmap='viridis', origin='lower',
+                        vmin=0, vmax=1)
+    axs[0].set_title('Output')
+    axs[0].set_xlabel('Time')
+    axs[0].set_ylabel('Neuron Index')
+    plt.colorbar(im1, ax=axs[0], label=f'Voltage')
+
+    # Plot second heatmap
+    im2 = axs[1].imshow(data2, aspect='auto', cmap='plasma', origin='lower')
+    axs[1].set_title('Input')
+    axs[1].set_xlabel('Time')
+    axs[1].set_ylabel('Neuron Index')
+    plt.colorbar(im2, ax=axs[1], label='Input')
+
+    plt.tight_layout()
+    plt.show()
+
+def plot_animate_1d(data1, theta,data2=None):
+    """
+    Animates the time evolution of activity data1 (u(x,t)) and optional inputs data2.
+    
+    Parameters:
+    - data1: np.ndarray of shape (space,time)
+    - data2: np.ndarray of shape (space,time)
+    """
+
+    # Spatial resolution and axis
+    dx = 1  # Default spacing
+    
+    x_lim = data1.shape[0] * dx
+    x = np.arange(0, x_lim, dx)
+
+    # Set y-limits
+    y_min = min(data1.min(), data2.min())
+    y_max = max(data1.max(), data2.max())
+
+    # Set up plot
+    plt.ion()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.set_xlim(x[0], x[-1])
+    ax.set_ylim(y_min, 2)
+    ax.set_xlabel("x")
+    ax.set_ylabel("Activity/Input")
+
+    data1 = data1.T
+    data2 = data2.T
+
+    line1, = ax.plot(x, data1[0], label="u(x)")
+    line2, = ax.plot(x, data2[0], label="Input")
+
+    ax.legend()
+    # Plot the constant line (theta) if provided
+    if theta is not None:
+        ax.axhline(y=theta, color='r', linestyle='--', label=f"theta = {theta}")
+        ax.legend()
+
+    # Animation loop
+    for i in range(data1.shape[0]):
+        if i % 2 == 0:
+            line1.set_ydata(data1[i])
+
+            if data2 is not None:
+                line2.set_ydata(data2[i])
+            fig.canvas.draw()
+            fig.canvas.flush_events()
+            time.sleep(0.002)
+
+def heatmap_1D_adj(data1, data2, G, time, fixed_timestep=0):
+    """
+    Plots a heatmap of data1 and line plots of data1 and data2 across neuron locations at a fixed timestep.
+
+    Parameters:
+    - data1: np.ndarray of shape (neurons, time)
+    - data2: np.ndarray of shape (neurons, time)
+    - G: object or namespace with attribute x (neuron locations), shape (neurons,)
+    - time: np.ndarray of shape (time,), actual time values
+    - fixed_timestep: int, index into time array
+    """
+    fig, axs = plt.subplots(1, 3, figsize=(18, 4))
+    extent = [time[0], time[-1], G[0], G[-1]]
+
+    # Heatmap of data1 with actual time on x-axis
+    im1 = axs[0].imshow(data1, aspect='auto', cmap='viridis', origin='lower',
+                        extent=extent,
+                        vmin=0, vmax=1)
+    axs[0].set_title('Membrane potential')
+    axs[0].set_xlabel('Time t [s]')
+    axs[0].set_ylabel('Space x [m]')
+
+    plt.colorbar(im1, ax=axs[0])
+
+    # Plot data1 at fixed timestep vs neuron location
+    axs[1].plot(G, data1[:, fixed_timestep], label='Output', color='blue')
+    axs[1].set_title(f'Snapshot at t = {time[500]:.2f} [s]')
+    axs[1].set_xlabel('Space x [m]')
+    axs[1].set_ylabel('Voltage [V]')
+    axs[1].grid(True)
+
+    axs[1].legend()
+
+    # Plot data2 at fixed timestep vs neuron location
+    axs[2].plot(G, data1[:, -1], label='Input', color='blue')
+    axs[2].set_title(f'Snapshot at t = {time[-1]:.2f} [s]')
+    axs[2].set_xlabel('Space x [m]')
+    axs[2].set_ylabel('Voltage [V]')
+    axs[2].grid(True)
+    axs[2].legend()
+
+    plt.tight_layout()
+    plt.show()
+
+def heatmap_1D_adj_2(data1, data2, G, time, fixed_timestep=0):
+    """
+    Plots a heatmap of data1 and line plots of data1 and data2 across neuron locations at a fixed timestep.
+
+    Parameters:
+    - data1: np.ndarray of shape (neurons, time)
+    - data2: np.ndarray of shape (neurons, time)
+    - G: array of neuron locations, shape (neurons,)
+    - time: np.ndarray of shape (time,), actual time values
+    - fixed_timestep: int, index into time array
+    """
+
+    # Set MATLAB-like font styles
+    mpl.rcParams.update({
+        'font.family': 'DejaVu Sans',  # 'Arial' if available
+        'font.size': 12,
+        'axes.titlesize': 14,
+        'axes.labelsize': 13,
+        'xtick.labelsize': 11,
+        'ytick.labelsize': 11,
+        'legend.fontsize': 11
+    })
+
+    fig, axs = plt.subplots(1, 3, figsize=(18, 4))
+    extent = [time[0], time[-1], G[0], G[-1]]
+
+    # Heatmap of data1 with actual time on x-axis
+    im1 = axs[0].imshow(data1, aspect='auto', cmap='viridis', origin='lower',
+                        extent=extent, vmin=0, vmax=1)
+    axs[0].set_title('Membrane Potential')
+    axs[0].set_xlabel('Time t [s]')
+    axs[0].set_ylabel('Space x [m]')
+    plt.colorbar(im1, ax=axs[0])
+
+    # Plot data1 at fixed timestep vs neuron location
+    axs[1].plot(G, data1[:, 450], color='blue')
+    axs[1].set_title(f'Snapshot at t = {time[450]:.2f} [s]')
+    axs[1].set_xlabel('Space x [m]')
+    axs[1].set_ylabel('Voltage [V]')
+    axs[1].grid(True)
+
+    # Plot data2 at last timestep vs neuron location
+    axs[2].plot(G, data1[:, 460], color='blue')
+    axs[2].set_title(f'Snapshot at t = {time[460]:.3f} [s]')
+    axs[2].set_xlabel('Space x [m]')
+    axs[2].set_ylabel('Voltage [V]')
+    axs[2].grid(True)
+
+    plt.tight_layout()
+     # Save the figure
+    plt.savefig('membrane_potential.png', dpi=300)  # You can change dpi or format if needed
+    
+    plt.show()

@@ -713,7 +713,7 @@ class AmariCoupledFHN(Dynamics):
 
 
 class LIFBrian2(Dynamics):
-    def __init__(self,x_lim,tau,N,theta,refractory,reset_value, kernel_type,kernel_pars,delta):
+    def __init__(self,x_lim,tau,N,theta,refractory,reset_value,conduction_speed, kernel_type,kernel_pars,delta):
         '''Leaky Integrate and Fire (LIF) neuron model simulated using Brian2: https://brian2.readthedocs.io/en/stable/'''
         super().__init__(N, N)
         self._method = "Brian2" 
@@ -722,6 +722,7 @@ class LIFBrian2(Dynamics):
         self.theta = theta
         self.refractory = refractory
         self.reset_value = reset_value
+        self.conduction_speed = conduction_speed * mm / ms
         self.kernel_type = kernel_type
         self.kernel_pars = kernel_pars
         self.delta = delta
@@ -740,7 +741,8 @@ class LIFBrian2(Dynamics):
         self.S = Synapses(self.G, self.G, """
             w : 1
              """,on_pre="v += w")
-        self.S.connect(condition='i!=j') # connect all to all except self to self
+        # self.S.connect(condition='i!=j') # connect all to all except self to self
+        self.S.connect(condition='(j - i) % 100 > 0 and (j - i) % 100 <= 25')
 
         self.G.x = 'i*neuron_spacing' # create spatial locations for each neuron
         self.locations = asarray(self.G.x) # locations of neurons in the network
@@ -777,20 +779,43 @@ class LIFBrian2(Dynamics):
             plt.tight_layout()
             plt.show()
             return kernel
+        
+        def traveling_wave_kernel(diff, direction='right', scale=1.0):
+            """
+            Creates a directional (asymmetric) kernel for traveling waves.
+
+            Parameters:
+                diff: np.array of absolute distances
+                direction: 'right' or 'left' to control wave direction
+                scale: decay factor (smaller = sharper localization)
+
+            Returns:
+                np.array of weights
+            """
+            diff = asarray(diff)
+            if direction == 'right':
+                weights = np.where(self.S.j > self.S.i, np.exp(-diff / scale), 0.0)
+            else:
+                weights = np.where(self.S.j < self.S.i, np.exp(-diff / scale), 0.0)
+            return weights    
             
+
+
         if kernel_type == 0:
             self.kernel = guassian_kernel 
         if kernel_type == 1:
             self.kernel = mexican_hat_kernel
         if kernel_type == 3:
             self.kernel = cosine_kernel
+        if kernel_type == 4:
+            self.kernel = traveling_wave_kernel
 
         diff = np.abs(self.G.x[self.S.i] - self.G.x[self.S.j])
         diff_wrapped = np.minimum(diff, self.G.x[-1] - diff)
-        conduction_speed = 0.1*10*mm / ms
         self.S.w[:] = self.kernel(diff_wrapped)
-        self.S.delay[:] = diff_wrapped / conduction_speed
-        # visualise_connectivity(self.S)
+        print(self.S.w[0:25])
+        self.S.delay[:] = diff_wrapped / self.conduction_speed
+        visualise_connectivity(self.S)
 
         self.Statemon = StateMonitor(self.G, variables=True, record=True) # record
         self.net = Network(self.G, self.S, self.Statemon)  # for simulation purposes
@@ -803,10 +828,11 @@ class LIFBrian2(Dynamics):
         stimulus = TimedArray(u, dt=self.delta*ms)
         duration = (time_horizon - init_time) * ms 
         self.net.run(duration)
-        # heatmap_1D_adj_2(self.Statemon.v,self.Statemon.I,self.G.x,self.Statemon.t)
+        heatmap_1D_adj_2(self.Statemon.v,self.Statemon.I,self.G.x,self.Statemon.t)
         # heatmap_1D(self.Statemon.v,self.Statemon.I)
-        # plot_animate_1d(self.Statemon.v,self.theta,self.Statemon.I)
+        plot_animate_1d(self.Statemon.v,self.theta,self.Statemon.I)
         y, t = asarray(self.Statemon.v), asarray(self.Statemon.t) * 1000 # convert from s to ms (asarray returns it in seconds)
+        print(np.max(self.Statemon.v))
         return y, t
 
 

@@ -181,8 +181,8 @@ class LifInitialState(InitialStateGenerator):
 
 
     def _sample_impl(self):
-        v0 = 0.85 * np.exp(-0.5 * ((np.arange(self.N) - 30) / 10)**2)
-        v0 += 0.85 * np.exp(-0.5 * ((np.arange(self.N) - 90) / 10)**2)
+        v0 = 0.0 * np.exp(-0.5 * ((np.arange(self.N) - 0) / 20)**2)
+        # v0 += 0.85 * np.exp(-0.5 * ((np.arange(self.N) - 90) / 50)**2)
         return v0
     
 _initstategen_names = {
