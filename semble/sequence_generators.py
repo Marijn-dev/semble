@@ -213,8 +213,9 @@ class Gaussian1D(SequenceGenerator):
         return np.ones([n_control_vals, len(self.x)]) * 0
 
 class StepBrian(SequenceGenerator):
-    def __init__(self,magnitudes,period,dim,amplitude,std,rng=None):
+    def __init__(self,step,magnitudes,period,dim,amplitude,std,rng=None):
         super().__init__(dim, rng)
+        self.step = step
         self.period = period
         self._period = period
         self._min, self._max = magnitudes
@@ -225,40 +226,39 @@ class StepBrian(SequenceGenerator):
         n_control_vals = int(1+np.floor((time_range[1] - time_range[0]) / delta))
         n_amplitude_vals = int(np.ceil(n_control_vals / self._period))
 
-        step = True
-        guassian = False
-        if step:
+        if self.step:
             mask_amp_seq = self._rng.uniform(low=self._min,
                                 high=self._max,
                                 size=(n_amplitude_vals, 1)) 
             # Initialize a new array of zeros
             amp_seq = np.zeros(shape=(n_amplitude_vals, self.dim))
 
-            # Select random starting positions for the 10-neuron segments
+            # Select random starting positions for the 20-neuron segments
             for i in range(n_amplitude_vals):
-                # Randomly choose a starting index for the 10-neuron segment
-                start_idx = numpy.random.randint(0, self.dim - 40)
-                start_idx = 0
-                # Set the 10 consecutive neurons to the original random value
-                amp_seq[i, start_idx:start_idx+100] = mask_amp_seq[i, 0]  # Use the random value from t
-        if guassian:
+                # Randomly choose a starting index for the std-neuron segment
+                start_idx = numpy.random.randint(0, self.dim - self.std)
+                # Set the std consecutive neurons to the original random value
+                amp_seq[i, start_idx:start_idx+self.std] = mask_amp_seq[i, 0]  # Use the random value from t
+
+        else:
             neuron_indices = np.arange(self.dim)
-            mu = numpy.random.randint(low=neuron_indices[0], high=neuron_indices[-1], size=n_amplitude_vals) # random neuron locations
+            mu = numpy.random.randint(low=neuron_indices[0]+10, high=neuron_indices[-1]-10, size=n_amplitude_vals) # random neuron locations
+            magnitude = numpy.random.uniform(low=self._min, high=self._max, size=n_amplitude_vals) # random magnitudes
             amp_seq = np.zeros(shape=(n_amplitude_vals, self.dim))
             for i,mean in enumerate(mu):
-                amp_seq[i] = self.amplitude * np.exp(-0.5 * ((neuron_indices - mean) ** 2) / self.std ** 2)
+                amp_seq[i] = magnitude[i] * np.exp(-0.5 * ((neuron_indices - mean) ** 2) / self.std ** 2)
 
         control_seq = np.repeat(amp_seq, self._period, axis=0)[:n_control_vals]
-        control_seq = np.zeros((101,100)) * 1.0
-        # control_seq = np.ones((101,100)) * 1.1
+        # control_seq = np.zeros((101,500)) * 1.0
+        # # control_seq = np.ones((101,100)) * 1.1
 
-        control_seq[:,0:5] = 53.5
+        # control_seq[:,45:55] = 53.5
         # control_seq[:,5:10] = 32.5
         # control_seq[:,10:] = 10
         # control_seq[:,25:35] = 1.5
         # control_seq[:,75:85] = 1.1
         # print(np.shape(control_seq))
-        control_seq[15:,:] = 0.0
+        # control_seq[15:,:] = 0.0
         return control_seq
 
     

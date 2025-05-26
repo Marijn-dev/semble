@@ -181,8 +181,18 @@ class LifInitialState(InitialStateGenerator):
 
 
     def _sample_impl(self):
-        v0 = 0.0 * np.exp(-0.5 * ((np.arange(self.N) - 0) / 20)**2)
-        # v0 += 0.85 * np.exp(-0.5 * ((np.arange(self.N) - 90) / 50)**2)
+        x = np.arange(self.N)
+        v0 = np.zeros(self.N)
+
+        # for _ in range(self.bumps):
+            # center = self._rng.integers(20, self.N-20)              # random center
+            # width = self._rng.uniform(20, 200)                    # random std dev
+            # height = self._rng.uniform(0.3, 1.0)                # random peak value
+            # v0 += height * np.exp(-0.5 * ((x - center) / width)**2)
+        v0 = 0.85 * np.exp(-0.5 * ((np.arange(self.N) - 30) / 10)**2)
+        v0 += 0.85 * np.exp(-0.5 * ((np.arange(self.N) - 90) / 10)**2)
+        # v0 = np.zeros(self.N)
+
         return v0
     
 _initstategen_names = {

@@ -1,7 +1,7 @@
 import numpy as np
 from . import initial_state
 from brian2 import *
-from .visualization import visualise_connectivity, heatmap_1D, plot_animate_1d, heatmap_1D_adj, heatmap_1D_adj_2
+from .visualization import visualise_connectivity, heatmap_1D, plot_animate_1d, heatmap_1D_adj, heatmap_1D_adj_2,plot_slider_1d
 
 class Dynamics:
 
@@ -741,16 +741,30 @@ class LIFBrian2(Dynamics):
         self.S = Synapses(self.G, self.G, """
             w : 1
              """,on_pre="v += w")
-        # self.S.connect(condition='i!=j') # connect all to all except self to self
-        self.S.connect(condition='(j - i) % 100 > 0 and (j - i) % 100 <= 25')
+        self.S.connect(condition='i!=j') # connect all to all except self to self
+        # self.S.connect(condition='(j - i) % 500 > 0 and (j - i) % 500 <= 25')
 
         self.G.x = 'i*neuron_spacing' # create spatial locations for each neuron
         self.locations = asarray(self.G.x) # locations of neurons in the network
         
         def guassian_kernel(x):
             x = asarray(x)
+            print(np.max(x))
+            print(np.min(x))
+            # x = x * 100
             scale, sigma = kernel_pars
-            return scale * np.exp(-0.5 * x ** 2 / sigma ** 2)
+            kernel = scale * np.exp(-0.5 * x ** 2 / sigma ** 2)
+            plt.figure(figsize=(8, 4))
+            plt.plot(x, kernel, label='Kernel')
+            plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+            plt.title('Difference-of-Gaussians Kernel')
+            plt.xlabel('Scaled Space (x ∈ [-10, 10])')
+            plt.ylabel('Weight')
+            plt.grid(True)
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            return kernel
         
         def cosine_kernel(x):
             x = asarray(x)
@@ -762,14 +776,16 @@ class LIFBrian2(Dynamics):
         
         def mexican_hat_kernel(x):
             x = asarray(x)
-            x_scaled = (x - 0.006125) * (6 / 0.01225)  # Center and stretch
-            x_scaled = (x - 0.01225 / 2) * (20 / 0.01225)
-
+            print(np.max(x))
+            print(np.min(x))
+            # x_scaled = (x - 0.006125) * (6 / 0.01225)  # Center and stretch
+            x_scaled = (x - np.max(x) / 2) * (20 / np.max(x))
+            x = x * 100
             scale,a_ex, s_ex, a_in, s_in, w_in = kernel_pars
-            kernel = a_ex * np.exp(-0.5 * x_scaled ** 2 / s_ex ** 2) - a_in * np.exp(-0.5 * x_scaled ** 2 / s_in ** 2) - w_in
+            kernel = a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - a_in * np.exp(-0.5 * x ** 2 / s_in ** 2) - w_in
             kernel = kernel * scale
             plt.figure(figsize=(8, 4))
-            plt.plot(x_scaled, kernel, label='Kernel')
+            plt.plot(x, kernel, label='Kernel')
             plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
             plt.title('Difference-of-Gaussians Kernel')
             plt.xlabel('Scaled Space (x ∈ [-10, 10])')
@@ -813,7 +829,8 @@ class LIFBrian2(Dynamics):
         diff = np.abs(self.G.x[self.S.i] - self.G.x[self.S.j])
         diff_wrapped = np.minimum(diff, self.G.x[-1] - diff)
         self.S.w[:] = self.kernel(diff_wrapped)
-        print(self.S.w[0:25])
+        # print(np.shape(self.S.w))
+        # print(self.S.w[:99])
         self.S.delay[:] = diff_wrapped / self.conduction_speed
         visualise_connectivity(self.S)
 
@@ -821,7 +838,6 @@ class LIFBrian2(Dynamics):
         self.net = Network(self.G, self.S, self.Statemon)  # for simulation purposes
         self.net.store('initial')  # Save initial state (e.g., before first simulate call)
 
-        
     def simulate(self, x, u,n_samples,time_horizon,init_time):
         self.net.restore('initial')
         self.G.v = x # initial condition
@@ -829,10 +845,11 @@ class LIFBrian2(Dynamics):
         duration = (time_horizon - init_time) * ms 
         self.net.run(duration)
         heatmap_1D_adj_2(self.Statemon.v,self.Statemon.I,self.G.x,self.Statemon.t)
+        # plot_slider_1d(self.Statemon.v,self.Statemon.I)
+
         # heatmap_1D(self.Statemon.v,self.Statemon.I)
-        plot_animate_1d(self.Statemon.v,self.theta,self.Statemon.I)
+        # plot_animate_1d(self.Statemon.v,self.theta,self.Statemon.I)
         y, t = asarray(self.Statemon.v), asarray(self.Statemon.t) * 1000 # convert from s to ms (asarray returns it in seconds)
-        print(np.max(self.Statemon.v))
         return y, t
 
 
