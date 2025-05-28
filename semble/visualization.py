@@ -193,17 +193,17 @@ def heatmap_1D_adj_2(data1, data2, G, time, fixed_timestep=0):
     axs[0].set_xlabel('Time t [s]')
     axs[0].set_ylabel('Space x [m]')
     plt.colorbar(im1, ax=axs[0])
-
+    t = 4500
     # Plot data1 at fixed timestep vs neuron location
-    axs[1].plot(G, data1[:, 450], color='blue')
-    axs[1].set_title(f'Snapshot at t = {time[450]:.2f} [s]')
+    axs[1].plot(G, data1[:, 0], color='blue')
+    axs[1].set_title(f'Snapshot at t = {time[0]:.2f} [s]')
     axs[1].set_xlabel('Space x [m]')
     axs[1].set_ylabel('Voltage [V]')
     axs[1].grid(True)
 
     # Plot data2 at last timestep vs neuron location
-    axs[2].plot(G, data1[:, 460], color='blue')
-    axs[2].set_title(f'Snapshot at t = {time[460]:.3f} [s]')
+    axs[2].plot(G, data1[:, t-1000], color='blue')
+    axs[2].set_title(f'Snapshot at t = {time[t-1000]:.3f} [s]')
     axs[2].set_xlabel('Space x [m]')
     axs[2].set_ylabel('Voltage [V]')
     axs[2].grid(True)
@@ -212,4 +212,67 @@ def heatmap_1D_adj_2(data1, data2, G, time, fixed_timestep=0):
      # Save the figure
     plt.savefig('membrane_potential.png', dpi=300)  # You can change dpi or format if needed
     
+    plt.show()
+
+def plot_slider_1d(data1, data2=None):
+    """
+    Creates an interactive slider plot of activity (data1) and optional inputs (data2),
+    assuming shape (space, time) for both.
+    """
+
+    # Transpose to [time, space]
+    data1 = data1.T
+    if data2 is not None:
+        data2 = data2.T
+
+    dx = 1  # Assume uniform spacing
+    x_lim = data1.shape[1] * dx
+    x = np.arange(0, x_lim, dx)
+
+    # Set y-axis limits
+    if data2 is not None:
+        y_min = min(data1.min(), data2.min())
+        y_max = max(data1.max(), data2.max())
+    else:
+        y_min = data1.min()
+        y_max = data1.max()
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    plt.subplots_adjust(bottom=0.25)
+
+    line1, = ax.plot(x, data1[0], label='u(x)')
+    if data2 is not None:
+        line2, = ax.plot(x, data2[0], label='Input(x)', linestyle='dashed')
+
+    ax.legend()
+    ax.set_xlim(x[0], x[-1])
+    ax.set_ylim(y_min, y_max)
+    ax.set_xlabel('x')
+
+    # Slider setup
+    ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03])
+    slider = Slider(ax_slider, '', 0, data1.shape[0] - 1, valinit=0, valstep=1)
+    slider.valtext.set_visible(False)
+
+    # Reset button
+    ax_reset = plt.axes([0.8, 0.02, 0.1, 0.04])
+    reset_button = Button(ax_reset, 'Reset')
+
+    # Time label
+    time_label = plt.text(0.5, 0.05, f'Time Step: {slider.val/10} [ms]', transform=fig.transFigure, ha='center')
+
+    def update(val):
+        i = int(slider.val)
+        line1.set_ydata(data1[i])
+        if data2 is not None:
+            line2.set_ydata(data2[i])
+        time_label.set_text(f'Time Step: {i/10} [ms]')
+        fig.canvas.draw_idle()
+
+    def reset(event):
+        slider.set_val(0)
+
+    slider.on_changed(update)
+    reset_button.on_clicked(reset)
+
     plt.show()

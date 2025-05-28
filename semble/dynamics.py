@@ -737,6 +737,7 @@ class LIFBrian2(Dynamics):
         'tau': self.tau,
         'theta': self.theta,
         'reset_value': self.reset_value})
+        defaultclock.dt = 0.01*ms  # or whatever time resolution you need
 
         self.S = Synapses(self.G, self.G, """
             w : 1
@@ -749,9 +750,6 @@ class LIFBrian2(Dynamics):
         
         def guassian_kernel(x):
             x = asarray(x)
-            print(np.max(x))
-            print(np.min(x))
-            # x = x * 100
             scale, sigma = kernel_pars
             kernel = scale * np.exp(-0.5 * x ** 2 / sigma ** 2)
             plt.figure(figsize=(8, 4))
@@ -829,8 +827,6 @@ class LIFBrian2(Dynamics):
         diff = np.abs(self.G.x[self.S.i] - self.G.x[self.S.j])
         diff_wrapped = np.minimum(diff, self.G.x[-1] - diff)
         self.S.w[:] = self.kernel(diff_wrapped)
-        # print(np.shape(self.S.w))
-        # print(self.S.w[:99])
         self.S.delay[:] = diff_wrapped / self.conduction_speed
         visualise_connectivity(self.S)
 
@@ -844,7 +840,7 @@ class LIFBrian2(Dynamics):
         stimulus = TimedArray(u, dt=self.delta*ms)
         duration = (time_horizon - init_time) * ms 
         self.net.run(duration)
-        heatmap_1D_adj_2(self.Statemon.v,self.Statemon.I,self.G.x,self.Statemon.t)
+        # heatmap_1D_adj_2(self.Statemon.v,self.Statemon.I,self.G.x,self.Statemon.t)
         # plot_slider_1d(self.Statemon.v,self.Statemon.I)
 
         # heatmap_1D(self.Statemon.v,self.Statemon.I)
