@@ -47,6 +47,7 @@ class TrajectorySampler:
                                                         time_horizon),
                                             delta=self._delta)
             y, t = self._dyn.simulate(y0,control_seq,n_samples,time_horizon,self._init_time)
+            
         elif self._ode_method == "Brian2":
             control_seq = self._seq_gen.sample(time_range=(self._init_time,
                                                         time_horizon),
@@ -57,6 +58,8 @@ class TrajectorySampler:
             t_samples = np.sort(np.append(t_samples, [self._init_time]))
 
             closest_indices = np.abs(t[:, None] - t_samples).argmin(axis=0) # use this since the brian2 simulator uses a fixed time step
+            y_full = y
+            y_full = y_full.T
             t = t[closest_indices]
             y = y[:, closest_indices]
             y = y.T
@@ -87,7 +90,7 @@ class TrajectorySampler:
 
             y = traj.y.T
             t = traj.t.reshape(-1, 1)
-        return y0, t, y, control_seq
+        return y0, t, y, control_seq, y_full
 
 
 def lhs(n_samples, rng):
