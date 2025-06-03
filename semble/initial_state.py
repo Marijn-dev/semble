@@ -186,9 +186,15 @@ class LifInitialState(InitialStateGenerator):
 
     
         for _ in range(self.bumps):
-            center = self._rng.integers(20, self.N-20)              # random center
+            center = self._rng.integers(0, self.N)              # random center
             width = self._rng.uniform(5, 15)                    # random std dev
-            v0 += 0.45 * np.exp(-0.5 * ((x - center) / width)**2)
+            distance = np.minimum(
+                np.abs(x - center),
+                self.N - np.abs(x - center)
+                )
+
+            v0 += 0.45 * np.exp(-0.5 * (distance / width) ** 2)
+            # v0 += 0.45 * np.exp(-0.5 * ((x - center) / width)**2)
 
         return v0
     

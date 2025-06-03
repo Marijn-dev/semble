@@ -242,11 +242,17 @@ class StepBrian(SequenceGenerator):
 
         else:
             neuron_indices = np.arange(self.dim)
-            mu = numpy.random.randint(low=neuron_indices[0]+10, high=neuron_indices[-1]-10, size=n_amplitude_vals) # random neuron locations
+            mu = numpy.random.randint(low=neuron_indices[0], high=neuron_indices[-1], size=n_amplitude_vals) # random neuron locations
             magnitude = numpy.random.uniform(low=self._min, high=self._max, size=n_amplitude_vals) # random magnitudes
             amp_seq = np.zeros(shape=(n_amplitude_vals, self.dim))
             for i,mean in enumerate(mu):
-                amp_seq[i] = magnitude[i] * np.exp(-0.5 * ((neuron_indices - mean) ** 2) / self.std ** 2)
+                # make sure it loops around the neuron indices
+                distance = np.minimum(
+                    np.abs(neuron_indices - mean),
+                    self.dim - np.abs(neuron_indices - mean)
+                    )
+                amp_seq[i] = magnitude[i] * np.exp(-0.5 * (distance ** 2) / self.std ** 2)
+                # amp_seq[i] = magnitude[i] * np.exp(-0.5 * ((neuron_indices - mean) ** 2) / self.std ** 2)
 
         control_seq = np.repeat(amp_seq, self._period, axis=0)[:n_control_vals]
         # control_seq = np.zeros((101,500)) * 1.0
