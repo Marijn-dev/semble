@@ -198,6 +198,42 @@ class LifInitialState(InitialStateGenerator):
 
         return v0
     
+class LifCoupledInitialState(InitialStateGenerator):
+    def __init__(self,bumps,N,rng:np.random.Generator = None):
+        '''returns empty array'''
+        super().__init__(rng)
+        self.N = N
+        self.bumps = bumps
+
+
+    def _sample_impl(self):
+        x = np.arange(self.N)
+        v0 = np.zeros(self.N)
+        h0 = np.zeros(self.N)
+
+    
+        for _ in range(self.bumps):
+            center = self._rng.integers(0, self.N)              # random center
+            width = self._rng.uniform(5, 15)                    # random std dev
+            distance = np.minimum(
+                np.abs(x - center),
+                self.N - np.abs(x - center)
+                )
+
+            v0 += 0.45 * np.exp(-0.5 * (distance / width) ** 2)
+
+            center = self._rng.integers(0, self.N)              # random center
+            width = self._rng.uniform(5, 15)                    # random std dev
+            distance = np.minimum(
+                np.abs(x - center),
+                self.N - np.abs(x - center)
+                )
+
+            h0 += 0.45 * np.exp(-0.5 * (distance / width) ** 2)
+            # v0 += 0.45 * np.exp(-0.5 * ((x - center) / width)**2)
+
+            return v0, h0
+        
 _initstategen_names = {
     "GaussianInitialState": GaussianInitialState,
     "UniformInitialState": UniformInitialState,
@@ -212,6 +248,7 @@ _initstategen_names = {
     "AmariCoupledInitialState":AmariCoupledInitialState,
     "AmariCoupledFHNInitialState":AmariCoupledFHNInitialState,
     "LifInitialState": LifInitialState,
+    "LifCoupledInitialState": LifCoupledInitialState,
 }
 
 

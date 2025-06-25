@@ -107,7 +107,7 @@ def plot_animate_1d(data1, theta,data2=None):
 
     # Animation loop
     for i in range(data1.shape[0]):
-        if i % 2 == 0:
+        if i % 20 == 0:
             line1.set_ydata(data1[i])
 
             if data2 is not None:
@@ -188,7 +188,7 @@ def heatmap_1D_adj_2(data1, data2, G, time, fixed_timestep=0):
 
     # Heatmap of data1 with actual time on x-axis
     im1 = axs[0].imshow(data1, aspect='auto', cmap='viridis', origin='lower',
-                        extent=extent, vmin=0, vmax=1)
+                        extent=extent, vmin=0, vmax=1.5)
     axs[0].set_title('Membrane Potential')
     axs[0].set_xlabel('Time t [s]')
     axs[0].set_ylabel('Space x [m]')
@@ -214,35 +214,39 @@ def heatmap_1D_adj_2(data1, data2, G, time, fixed_timestep=0):
     
     plt.show()
 
-def plot_slider_1d(data1, data2=None):
+def plot_slider_1d(data1, data2,data3=None):
     """
     Creates an interactive slider plot of activity (data1) and optional inputs (data2),
     assuming shape (space, time) for both.
     """
-
+    print(np.shape(data1), np.shape(data2), np.shape(data3))
     # Transpose to [time, space]
     data1 = data1.T
-    if data2 is not None:
-        data2 = data2.T
+    data2 = data2.T
 
+    if data3 is not None:
+        data3 = data3.T
+        
     dx = 1  # Assume uniform spacing
     x_lim = data1.shape[1] * dx
     x = np.arange(0, x_lim, dx)
 
     # Set y-axis limits
-    if data2 is not None:
-        y_min = min(data1.min(), data2.min())
-        y_max = max(data1.max(), data2.max())
-    else:
-        y_min = data1.min()
-        y_max = data1.max()
+   
+    y_min = min(data1.min(), data2.min())
+    y_max = max(data1.max(), data2.max())
+
+    
 
     fig, ax = plt.subplots(figsize=(6, 4))
     plt.subplots_adjust(bottom=0.25)
 
     line1, = ax.plot(x, data1[0], label='u(x)')
-    if data2 is not None:
-        line2, = ax.plot(x, data2[0], label='Input(x)', linestyle='dashed')
+    
+    line2, = ax.plot(x, data2[0], label='Input(x)', linestyle='dashed')
+
+    if data3 is not None:
+        line3, = ax.plot(x, data3[0], label='h(x)')
 
     ax.legend()
     ax.set_xlim(x[0], x[-1])
@@ -264,8 +268,9 @@ def plot_slider_1d(data1, data2=None):
     def update(val):
         i = int(slider.val)
         line1.set_ydata(data1[i])
-        if data2 is not None:
-            line2.set_ydata(data2[i])
+        line2.set_ydata(data2[i])
+        if data3 is not None:
+            line3.set_ydata(data3[i])
         time_label.set_text(f'Time Step: {i/10} [ms]')
         fig.canvas.draw_idle()
 

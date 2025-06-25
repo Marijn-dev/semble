@@ -2,6 +2,7 @@ import numpy as np
 from . import initial_state
 from brian2 import *
 from .visualization import visualise_connectivity, heatmap_1D, plot_animate_1d, heatmap_1D_adj, heatmap_1D_adj_2,plot_slider_1d
+from time import time
 
 class Dynamics:
 
@@ -728,11 +729,13 @@ class LIFBrian2(Dynamics):
         self.delta = delta
         neuron_spacing = self.x_lim / N
         self.tau = tau * ms
+      
         self.eqs =  '''     
                     dv/dt = (I-v)/tau : 1 (unless refractory)
                     I = stimulus(t,i)    : 1 # i == neuron index
                     x : metre
                     '''
+        
         self.G = NeuronGroup(self.N,self.eqs, threshold='v>theta', refractory=self.refractory*ms,reset='v=reset_value', method='euler',namespace={
         'tau': self.tau,
         'theta': self.theta,
@@ -741,7 +744,7 @@ class LIFBrian2(Dynamics):
 
         self.S = Synapses(self.G, self.G, """
             w : 1
-             """,on_pre="v += w")
+             """,on_pre="v += w")  # synaptic weight and dynamics
         self.S.connect(condition='i!=j') # connect all to all except self to self
         # self.S.connect(condition='(j - i) % 500 > 0 and (j - i) % 500 <= 25')
 
@@ -750,13 +753,14 @@ class LIFBrian2(Dynamics):
         
         def guassian_kernel(x):
             x = asarray(x)
+            # x = np.sort(np.concatenate((-x, x)))
             scale, sigma = kernel_pars
-            kernel = scale * np.exp(-0.5 * x ** 2 / sigma ** 2)
+            kernel = scale * np.exp(-0.5 * np.abs(x) ** 2 / sigma ** 2)
             plt.figure(figsize=(8, 4))
             plt.plot(x, kernel, label='Kernel')
             plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
-            plt.title('Difference-of-Gaussians Kernel')
-            plt.xlabel('Scaled Space (x ∈ [-10, 10])')
+            plt.title('Gaussians Kernel')
+            plt.xlabel('distance [m]')
             plt.ylabel('Weight')
             plt.grid(True)
             plt.legend()
@@ -774,11 +778,9 @@ class LIFBrian2(Dynamics):
         
         def mexican_hat_kernel(x):
             x = asarray(x)
-            print(np.max(x))
-            print(np.min(x))
             # x_scaled = (x - 0.006125) * (6 / 0.01225)  # Center and stretch
-            x_scaled = (x - np.max(x) / 2) * (20 / np.max(x))
-            x = x * 100
+            # x_scaled = (x - np.max(x) / 2) * (20 / np.max(x))
+            # x = x * 100
             scale,a_ex, s_ex, a_in, s_in, w_in = kernel_pars
             kernel = a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - a_in * np.exp(-0.5 * x ** 2 / s_in ** 2) - w_in
             kernel = kernel * scale
@@ -828,6 +830,7 @@ class LIFBrian2(Dynamics):
         diff_wrapped = np.minimum(diff, self.G.x[-1] - diff)
         self.S.w[:] = self.kernel(diff_wrapped)
         self.S.delay[:] = diff_wrapped / self.conduction_speed
+        # return
         visualise_connectivity(self.S)
 
         self.Statemon = StateMonitor(self.G, variables=True, record=True) # record
@@ -839,14 +842,330 @@ class LIFBrian2(Dynamics):
         self.G.v = x # initial condition
         stimulus = TimedArray(u, dt=self.delta*ms)
         duration = (time_horizon - init_time) * ms 
+        start = time()
         self.net.run(duration)
-        # heatmap_1D_adj_2(self.Statemon.v,self.Statemon.I,self.G.x,self.Statemon.t)
-        # plot_slider_1d(self.Statemon.v,self.Statemon.I)
+        end = time()
+        # print("simulation took:",start-end)
+        heatmap_1D_adj_2(self.Statemon.v,self.Statemon.I,self.G.x,self.Statemon.t)
+        plot_slider_1d(self.Statemon.v,self.Statemon.I)
 
         # heatmap_1D(self.Statemon.v,self.Statemon.I)
-        # plot_animate_1d(self.Statemon.v,self.theta,self.Statemon.I)
+        plot_animate_1d(self.Statemon.v,self.theta,self.Statemon.I)
         y, t = asarray(self.Statemon.v), asarray(self.Statemon.t) * 1000 # convert from s to ms (asarray returns it in seconds)
         return y, t
+
+class LIFCoupledBrian2(Dynamics):
+    def __init__(self,x_lim,tau,N,theta,refractory,reset_value,conduction_speed, kernel_type,kernel_pars,delta):
+        '''Leaky Integrate and Fire (LIF) neuron model simulated using Brian2: https://brian2.readthedocs.io/en/stable/'''
+        super().__init__(N, N)
+        self._method = "Brian2" 
+        self.x_lim = x_lim * mm
+        self.N = N
+        self.theta = theta
+        self.refractory = refractory
+        self.reset_value = reset_value
+        self.conduction_speed = conduction_speed * mm / ms
+        self.kernel_type = kernel_type
+        self.kernel_pars = kernel_pars
+        self.delta = delta
+        neuron_spacing = self.x_lim / N
+        self.tau = 1 * ms
+        self.tau_h = 0.5 * ms
+        self.eqs =  '''     
+                    dv/dt = (I-v+h)/tau : 1 (unless refractory)
+                    dh/dt = (-h + v)/tau_h : 1 (unless refractory)
+                    I = stimulus(t,i)    : 1 # i == neuron index
+                    x : metre
+                    '''
+        # self.eqs =  '''     
+        #             dv/dt = (I-v)/tau : 1 (unless refractory)
+        #             I = stimulus(t,i)    : 1 # i == neuron index
+        #             x : metre
+        #             '''
+        self.G = NeuronGroup(self.N,self.eqs, threshold='v>theta', refractory=self.refractory*ms,reset=None, method='euler',namespace={
+        'theta': self.theta,
+        'reset_value': self.reset_value,
+        'tau': self.tau,
+        'tau_h': self.tau_h})
+        defaultclock.dt = 0.01*ms  # or whatever time resolution you need
+
+        self.S = Synapses(self.G, self.G, """
+            w : 1
+             """,on_pre="v += w; h -= w")  # synaptic weight and dynamics
+        self.S.connect(condition='i!=j') # connect all to all except self to self
+        # self.S.connect(condition='(j - i) % 500 > 0 and (j - i) % 500 <= 25')
+
+        self.G.x = 'i*neuron_spacing' # create spatial locations for each neuron
+        self.locations = asarray(self.G.x) # locations of neurons in the network
+        
+        def guassian_kernel(x):
+            x = asarray(x)
+            # x = np.sort(np.concatenate((-x, x)))
+            scale, sigma = kernel_pars
+            kernel = scale * np.exp(-0.5 * np.abs(x) ** 2 / sigma ** 2)
+            plt.figure(figsize=(8, 4))
+            plt.plot(x, kernel, label='Kernel')
+            plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+            plt.title('Gaussians Kernel')
+            plt.xlabel('distance [m]')
+            plt.ylabel('Weight')
+            plt.grid(True)
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            return kernel
+        
+        def cosine_kernel(x):
+            x = asarray(x)
+            x_scaled = x / 0.01  # now x_scaled ∈ [0, 1]
+            x_scaled = (x - 0.01225 / 2) * (2 * np.pi / 0.01225)
+
+            scale,A1,A2,a1,a2 = kernel_pars
+            return   scale*(A1*np.exp(-a1* x_scaled ** 2 ) - A2*np.exp(-a2 * x_scaled ** 2)) * np.cos(x_scaled/2)
+        
+        def mexican_hat_kernel(x):
+            x = asarray(x)
+            # x_scaled = (x - 0.006125) * (6 / 0.01225)  # Center and stretch
+            # x_scaled = (x - np.max(x) / 2) * (20 / np.max(x))
+            # x = x * 100
+            scale,a_ex, s_ex, a_in, s_in, w_in = kernel_pars
+            kernel = a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - a_in * np.exp(-0.5 * x ** 2 / s_in ** 2) - w_in
+            kernel = kernel * scale
+            plt.figure(figsize=(8, 4))
+            plt.plot(x, kernel, label='Kernel')
+            plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+            plt.title('Difference-of-Gaussians Kernel')
+            plt.xlabel('Scaled Space (x ∈ [-10, 10])')
+            plt.ylabel('Weight')
+            plt.grid(True)
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            return kernel
+        
+        def traveling_wave_kernel(diff, direction='right', scale=1.0):
+            """
+            Creates a directional (asymmetric) kernel for traveling waves.
+
+            Parameters:
+                diff: np.array of absolute distances
+                direction: 'right' or 'left' to control wave direction
+                scale: decay factor (smaller = sharper localization)
+
+            Returns:
+                np.array of weights
+            """
+            diff = asarray(diff)
+            if direction == 'right':
+                weights = np.where(self.S.j > self.S.i, np.exp(-diff / scale), 0.0)
+            else:
+                weights = np.where(self.S.j < self.S.i, np.exp(-diff / scale), 0.0)
+            return weights    
+            
+
+
+        if kernel_type == 0:
+            self.kernel = guassian_kernel 
+        if kernel_type == 1:
+            self.kernel = mexican_hat_kernel
+        if kernel_type == 3:
+            self.kernel = cosine_kernel
+        if kernel_type == 4:
+            self.kernel = traveling_wave_kernel
+
+        diff = np.abs(self.G.x[self.S.i] - self.G.x[self.S.j])
+        diff_wrapped = np.minimum(diff, self.G.x[-1] - diff)
+        self.S.w[:] = self.kernel(diff_wrapped)
+        self.S.delay[:] = diff_wrapped / self.conduction_speed
+        # return
+        visualise_connectivity(self.S)
+
+        self.Statemon = StateMonitor(self.G, variables=True, record=True) # record
+        self.net = Network(self.G, self.S, self.Statemon)  # for simulation purposes
+        self.net.store('initial')  # Save initial state (e.g., before first simulate call)
+
+    def simulate(self, x, u,n_samples,time_horizon,init_time):
+        self.net.restore('initial')
+        self.G.v, self.G.h = x # initial condition
+        stimulus = TimedArray(u, dt=self.delta*ms)
+        duration = (time_horizon - init_time) * ms 
+        start = time()
+        self.net.run(duration)
+        end = time()
+        # print("simulation took:",start-end)
+        heatmap_1D_adj_2(self.Statemon.v,self.Statemon.I,self.G.x,self.Statemon.t)
+        plot_slider_1d(self.Statemon.v,self.Statemon.I,self.Statemon.h)
+
+        # heatmap_1D(self.Statemon.v,self.Statemon.I)
+        plot_animate_1d(self.Statemon.v,self.theta,self.Statemon.I)
+        y, t = asarray(self.Statemon.v), asarray(self.Statemon.t) * 1000 # convert from s to ms (asarray returns it in seconds)
+        return y, t
+
+class FHNBrian2(Dynamics):
+    def __init__(self,x_lim,tau,N,theta,refractory,reset_value,conduction_speed, kernel_type,kernel_pars,delta):
+        '''Leaky Integrate and Fire (LIF) neuron model simulated using Brian2: https://brian2.readthedocs.io/en/stable/'''
+        super().__init__(N, N)
+        self._method = "Brian2" 
+        self.x_lim = x_lim * mm
+        self.N = N
+        self.theta = theta
+        self.refractory = refractory
+        self.reset_value = reset_value
+        self.conduction_speed = conduction_speed * mm / ms
+        self.kernel_type = kernel_type
+        self.kernel_pars = kernel_pars
+        self.delta = delta
+        neuron_spacing = self.x_lim / N
+        self.tau = 1 * ms
+        self.tau_h = 0.5 * ms
+        
+        self.tau_v = 1*ms
+        tau_h = 0.8*ms
+        self.tau_h = 0.8 * ms
+        self.a = 0.7
+        self.b = 0.8
+        # def _dx(self, x, u):
+        # v, w = x
+
+        # dv = 50 * (v - v**3 - w + u.item())
+        # dw = (v - self.a - self.b * w) / self.tau
+
+        # return (dv, dw)
+        # self.eqs =  '''     
+        #             dv/dt = 50*(v-v**3-h+I) / tau_v : 1 (unless refractory)
+        #             dh/dt = (v-a-b*h)/tau_h  : 1 (unless refractory)
+        #             I = stimulus(t,i)    : 1 # i == neuron index
+        #             x : metre
+        #             '''
+        self.eqs =  '''     
+                    dv/dt = (v-(v**3/3)-h+I)/tau_v : 1 (unless refractory)
+                    dh/dt = 0.08*(v+a-b*h) /tau_h: 1 (unless refractory)
+                    I = stimulus(t,i)    : 1 # i == neuron index
+                    x : metre
+                    '''
+        self.G = NeuronGroup(self.N,self.eqs, threshold='v>theta', refractory=self.refractory*ms,reset=None, method='euler',namespace={
+        'theta': self.theta,
+        'reset_value': self.reset_value,
+        'a': self.a,
+        'b': self.b,
+        'tau_h': self.tau_h,
+        'tau_v': self.tau_v})
+        defaultclock.dt = 0.01*ms  # or whatever time resolution you need
+
+        self.S = Synapses(self.G, self.G, """
+            w : 1
+             """,on_pre="v += w; h -= w")  # synaptic weight and dynamics
+        self.S.connect(condition='i!=j') # connect all to all except self to self
+        # self.S.connect(condition='(j - i) % 500 > 0 and (j - i) % 500 <= 25')
+
+        self.G.x = 'i*neuron_spacing' # create spatial locations for each neuron
+        self.locations = asarray(self.G.x) # locations of neurons in the network
+        
+        def guassian_kernel(x):
+            x = asarray(x)
+            # x = np.sort(np.concatenate((-x, x)))
+            scale, sigma = kernel_pars
+            kernel = scale * np.exp(-0.5 * np.abs(x) ** 2 / sigma ** 2)
+            plt.figure(figsize=(8, 4))
+            plt.plot(x, kernel, label='Kernel')
+            plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+            plt.title('Gaussians Kernel')
+            plt.xlabel('distance [m]')
+            plt.ylabel('Weight')
+            plt.grid(True)
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            return kernel
+        
+        def cosine_kernel(x):
+            x = asarray(x)
+            x_scaled = x / 0.01  # now x_scaled ∈ [0, 1]
+            x_scaled = (x - 0.01225 / 2) * (2 * np.pi / 0.01225)
+
+            scale,A1,A2,a1,a2 = kernel_pars
+            return   scale*(A1*np.exp(-a1* x_scaled ** 2 ) - A2*np.exp(-a2 * x_scaled ** 2)) * np.cos(x_scaled/2)
+        
+        def mexican_hat_kernel(x):
+            x = asarray(x)
+            # x_scaled = (x - 0.006125) * (6 / 0.01225)  # Center and stretch
+            # x_scaled = (x - np.max(x) / 2) * (20 / np.max(x))
+            # x = x * 100
+            scale,a_ex, s_ex, a_in, s_in, w_in = kernel_pars
+            kernel = a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - a_in * np.exp(-0.5 * x ** 2 / s_in ** 2) - w_in
+            kernel = kernel * scale
+            plt.figure(figsize=(8, 4))
+            plt.plot(x, kernel, label='Kernel')
+            plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+            plt.title('Difference-of-Gaussians Kernel')
+            plt.xlabel('Scaled Space (x ∈ [-10, 10])')
+            plt.ylabel('Weight')
+            plt.grid(True)
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            return kernel
+        
+        def traveling_wave_kernel(diff, direction='right', scale=1.0):
+            """
+            Creates a directional (asymmetric) kernel for traveling waves.
+
+            Parameters:
+                diff: np.array of absolute distances
+                direction: 'right' or 'left' to control wave direction
+                scale: decay factor (smaller = sharper localization)
+
+            Returns:
+                np.array of weights
+            """
+            diff = asarray(diff)
+            if direction == 'right':
+                weights = np.where(self.S.j > self.S.i, np.exp(-diff / scale), 0.0)
+            else:
+                weights = np.where(self.S.j < self.S.i, np.exp(-diff / scale), 0.0)
+            return weights    
+            
+
+
+        if kernel_type == 0:
+            self.kernel = guassian_kernel 
+        if kernel_type == 1:
+            self.kernel = mexican_hat_kernel
+        if kernel_type == 3:
+            self.kernel = cosine_kernel
+        if kernel_type == 4:
+            self.kernel = traveling_wave_kernel
+
+        diff = np.abs(self.G.x[self.S.i] - self.G.x[self.S.j])
+        diff_wrapped = np.minimum(diff, self.G.x[-1] - diff)
+        self.S.w[:] = self.kernel(diff_wrapped)
+        self.S.delay[:] = diff_wrapped / self.conduction_speed
+        # return
+        visualise_connectivity(self.S)
+
+        self.Statemon = StateMonitor(self.G, variables=True, record=True) # record
+        self.net = Network(self.G, self.S, self.Statemon)  # for simulation purposes
+        self.net.store('initial')  # Save initial state (e.g., before first simulate call)
+
+    def simulate(self, x, u,n_samples,time_horizon,init_time):
+        self.net.restore('initial')
+        # self.G.v, self.G.h = x # initial condition
+        self.G.v = -1
+        self.G.h = 1
+        stimulus = TimedArray(u, dt=self.delta*ms)
+        duration = (time_horizon - init_time) * ms 
+        start = time()
+        self.net.run(duration)
+        end = time()
+        # print("simulation took:",start-end)
+        heatmap_1D_adj_2(self.Statemon.v,self.Statemon.I,self.G.x,self.Statemon.t)
+        plot_slider_1d(self.Statemon.v,self.Statemon.I,self.Statemon.h)
+
+        # heatmap_1D(self.Statemon.v,self.Statemon.I)
+        plot_animate_1d(self.Statemon.v,self.theta,self.Statemon.I)
+        y, t = asarray(self.Statemon.v), asarray(self.Statemon.t) * 1000 # convert from s to ms (asarray returns it in seconds)
+        return y, t
+
 
 
 
@@ -870,6 +1189,8 @@ _dynamics_names = {
     "AmariCoupled":AmariCoupled,
     "AmariCoupledFHN":AmariCoupledFHN,
     "LIFBrian2":LIFBrian2,
+    "LIFCoupledBrian2":LIFCoupledBrian2,
+    "FHNBrian2":FHNBrian2,
 }
 
 
