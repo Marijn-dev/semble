@@ -39,6 +39,12 @@ class TrajectorySampler:
         self.state_generator.rng = np.random.default_rng()
         self._rng = np.random.default_rng()
 
+    def reset_kernel(self):
+        '''
+        Resets the kernel parameters of in Brian2 dynamics
+        '''
+        self._dyn.reset_kernel()
+
     def get_example(self, time_horizon, n_samples):
         ### Returns a trajectory ###
         y0 = self.state_generator.sample()

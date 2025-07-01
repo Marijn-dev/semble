@@ -725,8 +725,9 @@ class LIFBrian2(Dynamics):
         self.conduction_speed = conduction_speed * mm / ms
         self.kernel_type = kernel_type
         self.kernel_pars = kernel_pars
+        
         self.delta = delta
-        neuron_spacing = self.x_lim / N
+        neuron_spacing = self.x_lim / self.N
         self.tau = tau * ms
         self.eqs =  '''     
                     dv/dt = (I-v)/tau : 1 (unless refractory)
@@ -748,20 +749,27 @@ class LIFBrian2(Dynamics):
         self.G.x = 'i*neuron_spacing' # create spatial locations for each neuron
         self.locations = asarray(self.G.x) # locations of neurons in the network
         
-        def guassian_kernel(x):
+        def guassian_kernel(x,scale=None,sigma=None):
             x = asarray(x)
-            scale, sigma = kernel_pars
+            if scale is None and sigma is None:
+                # If scale and sigma are not provided, generate random values
+                scale, sigma = [np.random.normal(loc=self.kernel_pars[0],scale=self.kernel_pars[0]/10),
+                                np.random.normal(loc=self.kernel_pars[1],scale=self.kernel_pars[1]/5)]
+            else:
+                scale, sigma = scale, sigma
+            
+            self.kernel_pars = [scale, sigma]
             kernel = scale * np.exp(-0.5 * x ** 2 / sigma ** 2)
-            plt.figure(figsize=(8, 4))
-            plt.plot(x, kernel, label='Kernel')
-            plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
-            plt.title('Difference-of-Gaussians Kernel')
-            plt.xlabel('Scaled Space (x ∈ [-10, 10])')
-            plt.ylabel('Weight')
-            plt.grid(True)
-            plt.legend()
-            plt.tight_layout()
-            plt.show()
+            # plt.figure(figsize=(8, 4))
+            # plt.plot(x, kernel, label='Kernel')
+            # plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+            # plt.title('Difference-of-Gaussians Kernel')
+            # plt.xlabel('Scaled Space (x ∈ [-10, 10])')
+            # plt.ylabel('Weight')
+            # plt.grid(True)
+            # plt.legend()
+            # plt.tight_layout()
+            # plt.show()
             return kernel
         
         def cosine_kernel(x):
@@ -814,7 +822,6 @@ class LIFBrian2(Dynamics):
             return weights    
             
 
-
         if kernel_type == 0:
             self.kernel = guassian_kernel 
         if kernel_type == 1:
@@ -825,24 +832,33 @@ class LIFBrian2(Dynamics):
             self.kernel = traveling_wave_kernel
 
         diff = np.abs(self.G.x[self.S.i] - self.G.x[self.S.j])
-        diff_wrapped = np.minimum(diff, self.G.x[-1] - diff)
-        self.S.w[:] = self.kernel(diff_wrapped)
-        self.S.delay[:] = diff_wrapped / self.conduction_speed
-        visualise_connectivity(self.S)
-
+        self.diff_wrapped = np.minimum(diff, self.G.x[-1] - diff)
+        self.S.w[:] = self.kernel(self.diff_wrapped,scale=0.1,sigma=0.001)
+        self.S.delay[:] = self.diff_wrapped / self.conduction_speed
         self.Statemon = StateMonitor(self.G, variables=True, record=True) # record
         self.net = Network(self.G, self.S, self.Statemon)  # for simulation purposes
         self.net.store('initial')  # Save initial state (e.g., before first simulate call)
 
+        
+        # self.reset_kernel()
+       
+        # self.first_run = True
+
+    def reset_kernel(self):
+        self.net.restore('initial')  # Save initial state (e.g., before first simulate call)
+        self.S.w[:] = self.kernel(self.diff_wrapped)
+        self.net.store('initial')  # Save initial state (e.g., before first simulate call)
+        print('resetting kernel')
+
     def simulate(self, x, u,n_samples,time_horizon,init_time):
         self.net.restore('initial')
         self.G.v = x # initial condition
+        
         stimulus = TimedArray(u, dt=self.delta*ms)
         duration = (time_horizon - init_time) * ms 
         self.net.run(duration)
         # heatmap_1D_adj_2(self.Statemon.v,self.Statemon.I,self.G.x,self.Statemon.t)
         # plot_slider_1d(self.Statemon.v,self.Statemon.I)
-
         # heatmap_1D(self.Statemon.v,self.Statemon.I)
         # plot_animate_1d(self.Statemon.v,self.theta,self.Statemon.I)
         y, t = asarray(self.Statemon.v), asarray(self.Statemon.t) * 1000 # convert from s to ms (asarray returns it in seconds)
