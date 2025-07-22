@@ -2,6 +2,7 @@ from brian2 import *
 import matplotlib as mpl
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 def visualise_connectivity(S):
 
@@ -107,7 +108,7 @@ def plot_animate_1d(data1, theta,data2=None):
 
     # Animation loop
     for i in range(data1.shape[0]):
-        if i % 20 == 0:
+        if i % 100 == 0:
             line1.set_ydata(data1[i])
 
             if data2 is not None:
@@ -115,6 +116,73 @@ def plot_animate_1d(data1, theta,data2=None):
             fig.canvas.draw()
             fig.canvas.flush_events()
             time.sleep(0.002)
+
+def save_activity_animation(data1, theta,  data2=None, filename="activity.gif"):
+    """
+    Animates and saves the time evolution of activity data1 (u(x,t)) and optional inputs data2.
+
+    Parameters:
+    - data1: np.ndarray of shape (space, time)
+    - data2: np.ndarray of shape (space, time), optional
+    - theta: float, optional threshold line
+    - dx: spatial resolution
+    - filename: name of the video file to save (e.g., .mp4 or .gif)
+    """
+    dx=1
+    # Transpose to shape (time, space)
+    data1 = data1.T
+    if data2 is not None:
+        data2 = data2.T
+
+    # Spatial axis
+    x = np.arange(0, data1.shape[1] * dx, dx)
+
+    # y-limits
+    y_min = min(data1.min(), data2.min()) if data2 is not None else data1.min()
+    y_max = max(data1.max(), data2.max()) if data2 is not None else data1.max()
+
+    # Set up figure
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.set_xlim(x[0], x[-1])
+    ax.set_ylim(y_min, 2)
+    ax.set_xlabel("x")
+    ax.set_ylabel("Activity/Input")
+
+    line1, = ax.plot(x, data1[0], label="u(x)")
+    line2 = None
+    if data2 is not None:
+        line2, = ax.plot(x, data2[0], label="Input")
+
+    if theta is not None:
+        ax.axhline(y=theta, color='r', linestyle='--', label=f"theta = {theta}")
+
+    ax.legend()
+
+    # Animation update function
+    def update(i):
+        line1.set_ydata(data1[i])
+        if data2 is not None and line2 is not None:
+            line2.set_ydata(data2[i])
+        return [line1, line2] if line2 else [line1]
+
+    # Create animation (skip frames for speed if needed)
+    ani = animation.FuncAnimation(
+        fig,
+        update,
+        frames=range(0, data1.shape[0], 10),  # Every 5th frame
+        interval=20,  # milliseconds
+        blit=False
+    )
+
+    # Save animation using ffmpeg or pillow
+    if filename.endswith(".mp4"):
+        ani.save(filename, writer='ffmpeg', fps=30)
+    elif filename.endswith(".gif"):
+        ani.save("gaussian_N200.gif", writer='pillow', fps=30)
+    else:
+        raise ValueError("Filename must end with .mp4 or .gif")
+
+    plt.close(fig)  # Close the figure after saving
 
 def heatmap_1D_adj(data1, data2, G, time, fixed_timestep=0):
     """
@@ -188,7 +256,7 @@ def heatmap_1D_adj_2(data1, data2, G, time, fixed_timestep=0):
 
     # Heatmap of data1 with actual time on x-axis
     im1 = axs[0].imshow(data1, aspect='auto', cmap='viridis', origin='lower',
-                        extent=extent, vmin=0, vmax=1.5)
+                        extent=extent, vmin=0, vmax=1)
     axs[0].set_title('Membrane Potential')
     axs[0].set_xlabel('Time t [s]')
     axs[0].set_ylabel('Space x [m]')
