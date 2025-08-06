@@ -774,11 +774,6 @@ class LIFBrian2(Dynamics):
         
         def mexican_hat_kernel(x):
             x = asarray(x)
-            print(np.max(x))
-            print(np.min(x))
-            # x_scaled = (x - 0.006125) * (6 / 0.01225)  # Center and stretch
-            x_scaled = (x - np.max(x) / 2) * (20 / np.max(x))
-            x = x * 100
             scale,a_ex, s_ex, a_in, s_in, w_in = kernel_pars
             kernel = a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - a_in * np.exp(-0.5 * x ** 2 / s_in ** 2) - w_in
             kernel = kernel * scale
@@ -787,6 +782,22 @@ class LIFBrian2(Dynamics):
             plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
             plt.title('Difference-of-Gaussians Kernel')
             plt.xlabel('Scaled Space (x ∈ [-10, 10])')
+            plt.ylabel('Weight')
+            plt.grid(True)
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            return kernel
+        
+        def oscillatory_kernel(x):
+            x = asarray(x)
+            A, b, alpha = kernel_pars
+            kernel = A * (np.exp(-b * np.abs(x)) * ((b * np.sin(np.abs(alpha * x))) + np.cos(alpha * x)))
+            plt.figure(figsize=(8, 4))
+            plt.plot(x, kernel, label='Kernel')
+            plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+            plt.title('Oscillatory kernel')
+            plt.xlabel('|x-y|')
             plt.ylabel('Weight')
             plt.grid(True)
             plt.legend()
@@ -819,6 +830,8 @@ class LIFBrian2(Dynamics):
             self.kernel = guassian_kernel 
         if kernel_type == 1:
             self.kernel = mexican_hat_kernel
+        if kernel_type == 2:
+            self.kernel = oscillatory_kernel
         if kernel_type == 3:
             self.kernel = cosine_kernel
         if kernel_type == 4:
@@ -829,7 +842,6 @@ class LIFBrian2(Dynamics):
         self.S.w[:] = self.kernel(diff_wrapped)
         self.S.delay[:] = diff_wrapped / self.conduction_speed
         visualise_connectivity(self.S)
-
         self.Statemon = StateMonitor(self.G, variables=True, record=True) # record
         self.net = Network(self.G, self.S, self.Statemon)  # for simulation purposes
         self.net.store('initial')  # Save initial state (e.g., before first simulate call)
