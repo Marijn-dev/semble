@@ -212,7 +212,7 @@ class Gaussian1D(SequenceGenerator):
         # return control_seq
         return np.ones([n_control_vals, len(self.x)]) * 0
 
-class StepBrian(SequenceGenerator):
+class LIF_input(SequenceGenerator):
     def __init__(self,step,magnitudes,period,dim,amplitude,std,rng=None):
         super().__init__(dim, rng)
         self.step = step
@@ -238,7 +238,7 @@ class StepBrian(SequenceGenerator):
                 # Randomly choose a starting index for the std-neuron segment
                 start_idx = numpy.random.randint(0, self.dim - self.std)
                 # Set the std consecutive neurons to the original random value
-                amp_seq[i, start_idx:start_idx+self.std] = mask_amp_seq[i, 0]  # Use the random value from t
+                amp_seq[i, 0:] = mask_amp_seq[i, 0]  # Use the random value from t
 
         else:
             neuron_indices = np.arange(self.dim)
@@ -246,25 +246,13 @@ class StepBrian(SequenceGenerator):
             magnitude = numpy.random.uniform(low=self._min, high=self._max, size=n_amplitude_vals) # random magnitudes
             amp_seq = np.zeros(shape=(n_amplitude_vals, self.dim))
             for i,mean in enumerate(mu):
-                # make sure it loops around the neuron indices
                 distance = np.minimum(
                     np.abs(neuron_indices - mean),
                     self.dim - np.abs(neuron_indices - mean)
                     )
                 amp_seq[i] = magnitude[i] * np.exp(-0.5 * (distance ** 2) / self.std ** 2)
-                # amp_seq[i] = magnitude[i] * np.exp(-0.5 * ((neuron_indices - mean) ** 2) / self.std ** 2)
 
         control_seq = np.repeat(amp_seq, self._period, axis=0)[:n_control_vals]
-        # control_seq = np.zeros((101,500)) * 1.0
-        # # control_seq = np.ones((101,100)) * 1.1
-
-        # control_seq[:,45:55] = 53.5
-        # control_seq[:,5:10] = 32.5
-        # control_seq[:,10:] = 10
-        # control_seq[:,25:35] = 1.5
-        # control_seq[:,75:85] = 1.1
-        # print(np.shape(control_seq))
-        # control_seq[15:,:] = 0.0
         return control_seq
 
     
@@ -276,7 +264,7 @@ _seqgen_names = {
     "RandomWalkSequence": RandomWalkSequence,
     "SinusoidalSequence": SinusoidalSequence,
     "Gaussian1D": Gaussian1D,
-    "StepBrian": StepBrian,
+    "LIF_input": LIF_input,
 }
 
 

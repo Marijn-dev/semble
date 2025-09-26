@@ -184,10 +184,10 @@ class LifInitialState(InitialStateGenerator):
         x = np.arange(self.N)
         v0 = np.zeros(self.N)
 
-    
-        for _ in range(self.bumps):
-            center = self._rng.integers(0, self.N)              # random center
-            width = self._rng.uniform(5, 15)                    # random std dev
+        centers = [25,75]
+        widths = [12,12]
+        for center, width in zip(centers, widths):
+            # width = self._rng.uniform(5, 15)                    # random std dev
             distance = np.minimum(
                 np.abs(x - center),
                 self.N - np.abs(x - center)

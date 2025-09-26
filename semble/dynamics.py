@@ -1,7 +1,8 @@
 import numpy as np
 from . import initial_state
 from brian2 import *
-from .visualization import visualise_connectivity, heatmap_1D, plot_animate_1d, heatmap_1D_adj, heatmap_1D_adj_2,plot_slider_1d
+from .visualization import visualise_connectivity, heatmap_1D, plot_animate_1d, heatmap_1D_adj, heatmap_1D_adj_2,plot_slider_1d,plot_fixed_views,plot_spatio_temporal_slices
+import time
 
 class Dynamics:
 
@@ -743,7 +744,6 @@ class LIFBrian2(Dynamics):
             w : 1
              """,on_pre="v += w")
         self.S.connect(condition='i!=j') # connect all to all except self to self
-        # self.S.connect(condition='(j - i) % 500 > 0 and (j - i) % 500 <= 25')
 
         self.G.x = 'i*neuron_spacing' # create spatial locations for each neuron
         self.locations = asarray(self.G.x) # locations of neurons in the network
@@ -752,16 +752,52 @@ class LIFBrian2(Dynamics):
             x = asarray(x)
             scale, sigma = kernel_pars
             kernel = scale * np.exp(-0.5 * x ** 2 / sigma ** 2)
-            plt.figure(figsize=(8, 4))
-            plt.plot(x, kernel, label='Kernel')
-            plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
-            plt.title('Difference-of-Gaussians Kernel')
-            plt.xlabel('Scaled Space (x ∈ [-10, 10])')
-            plt.ylabel('Weight')
-            plt.grid(True)
-            plt.legend()
-            plt.tight_layout()
-            plt.show()
+            # Uncomment to plot the kernel
+            # plt.figure(figsize=(8, 4))
+            # plt.plot(x, kernel, label='Kernel')
+            # plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+            # plt.title('Gaussian Kernel')
+            # plt.xlabel('|x-y|')
+            # plt.ylabel('Weight')
+            # plt.grid(True)
+            # plt.legend()
+            # plt.tight_layout()
+            # plt.show()
+            return kernel
+        
+        def mexhat_kernel(x):
+            x = asarray(x)
+            scale,a_ex, s_ex, a_in, s_in, w_in = kernel_pars
+            kernel = a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - a_in * np.exp(-0.5 * x ** 2 / s_in ** 2) - w_in
+            kernel = kernel * scale
+            # Uncomment to plot the kernel
+            # plt.figure(figsize=(8, 4))
+            # plt.plot(x, kernel, label='Kernel')
+            # plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+            # plt.title('Mex-hat kernel')
+            # plt.xlabel('|x-y|')
+            # plt.ylabel('Weight')
+            # plt.grid(True)
+            # plt.legend()
+            # plt.tight_layout()
+            # plt.show()
+            return kernel
+        
+        def oscillatory_kernel(x):
+            x = asarray(x)
+            A, b, alpha = kernel_pars
+            kernel = A * (np.exp(-b * np.abs(x)) * ((b * np.sin(np.abs(alpha * x))) + np.cos(alpha * x)))
+            # Uncomment to plot the kernel
+            # plt.figure(figsize=(8, 4))
+            # plt.plot(x, kernel, label='Kernel')
+            # plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+            # plt.title('Oscillatory kernel')
+            # plt.xlabel('|x-y|')
+            # plt.ylabel('Weight')
+            # plt.grid(True)
+            # plt.legend()
+            # plt.tight_layout()
+            # plt.show()
             return kernel
         
         def cosine_kernel(x):
@@ -770,41 +806,21 @@ class LIFBrian2(Dynamics):
             x_scaled = (x - 0.01225 / 2) * (2 * np.pi / 0.01225)
 
             scale,A1,A2,a1,a2 = kernel_pars
-            return   scale*(A1*np.exp(-a1* x_scaled ** 2 ) - A2*np.exp(-a2 * x_scaled ** 2)) * np.cos(x_scaled/2)
-        
-        def mexican_hat_kernel(x):
-            x = asarray(x)
-            scale,a_ex, s_ex, a_in, s_in, w_in = kernel_pars
-            kernel = a_ex * np.exp(-0.5 * x ** 2 / s_ex ** 2) - a_in * np.exp(-0.5 * x ** 2 / s_in ** 2) - w_in
-            kernel = kernel * scale
-            plt.figure(figsize=(8, 4))
-            plt.plot(x, kernel, label='Kernel')
-            plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
-            plt.title('Difference-of-Gaussians Kernel')
-            plt.xlabel('Scaled Space (x ∈ [-10, 10])')
-            plt.ylabel('Weight')
-            plt.grid(True)
-            plt.legend()
-            plt.tight_layout()
-            plt.show()
+            kernel = scale*(A1*np.exp(-a1* x_scaled ** 2 ) - A2*np.exp(-a2 * x_scaled ** 2)) * np.cos(x_scaled/2)
+            # Uncomment to plot the kernel
+            # plt.figure(figsize=(8, 4))
+            # plt.plot(x_scaled, kernel, label='Kernel')
+            # plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+            # plt.title('Cosine kernel')
+            # plt.xlabel('|x-y|')
+            # plt.ylabel('Weight')
+            # plt.grid(True)
+            # plt.legend()
+            # plt.tight_layout()
+            # plt.show()
             return kernel
         
-        def oscillatory_kernel(x):
-            x = asarray(x)
-            A, b, alpha = kernel_pars
-            kernel = A * (np.exp(-b * np.abs(x)) * ((b * np.sin(np.abs(alpha * x))) + np.cos(alpha * x)))
-            plt.figure(figsize=(8, 4))
-            plt.plot(x, kernel, label='Kernel')
-            plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
-            plt.title('Oscillatory kernel')
-            plt.xlabel('|x-y|')
-            plt.ylabel('Weight')
-            plt.grid(True)
-            plt.legend()
-            plt.tight_layout()
-            plt.show()
-            return kernel
-        
+
         def traveling_wave_kernel(diff, direction='right', scale=1.0):
             """
             Creates a directional (asymmetric) kernel for traveling waves.
@@ -829,7 +845,7 @@ class LIFBrian2(Dynamics):
         if kernel_type == 0:
             self.kernel = guassian_kernel 
         if kernel_type == 1:
-            self.kernel = mexican_hat_kernel
+            self.kernel = mexhat_kernel
         if kernel_type == 2:
             self.kernel = oscillatory_kernel
         if kernel_type == 3:
@@ -841,7 +857,8 @@ class LIFBrian2(Dynamics):
         diff_wrapped = np.minimum(diff, self.G.x[-1] - diff)
         self.S.w[:] = self.kernel(diff_wrapped)
         self.S.delay[:] = diff_wrapped / self.conduction_speed
-        visualise_connectivity(self.S)
+        # Uncomment to visualize the interconnections of the neurons
+        # visualise_connectivity(self.S)
         self.Statemon = StateMonitor(self.G, variables=True, record=True) # record
         self.net = Network(self.G, self.S, self.Statemon)  # for simulation purposes
         self.net.store('initial')  # Save initial state (e.g., before first simulate call)
@@ -852,10 +869,12 @@ class LIFBrian2(Dynamics):
         stimulus = TimedArray(u, dt=self.delta*ms)
         duration = (time_horizon - init_time) * ms 
         self.net.run(duration)
+        # Uncomment to visualize the trajectory
+        # plot_spatio_temporal_slices(self.Statemon.v)
         # heatmap_1D_adj_2(self.Statemon.v,self.Statemon.I,self.G.x,self.Statemon.t)
         # plot_slider_1d(self.Statemon.v,self.Statemon.I)
-
         # heatmap_1D(self.Statemon.v,self.Statemon.I)
+        # plot_fixed_views(self.Statemon.v)
         # plot_animate_1d(self.Statemon.v,self.theta,self.Statemon.I)
         y, t = asarray(self.Statemon.v), asarray(self.Statemon.t) * 1000 # convert from s to ms (asarray returns it in seconds)
         return y, t

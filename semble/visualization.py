@@ -66,6 +66,84 @@ def heatmap_1D(data1, data2):
     plt.tight_layout()
     plt.show()
 
+def plot_spatio_temporal_slices(data, time_idx=2500, neuron_idx=35):
+    """
+    Visualizes spatio-temporal data:
+    - Heatmap (neurons x time) with red lines marking selected time & neuron
+    - Slice across neurons at fixed time
+    - Slice across time for fixed neuron
+    
+    Parameters:
+    - data: np.ndarray of shape (neurons, time)
+    - time_idx: int, index of the time step for snapshot across neurons
+    - neuron_idx: int, index of the neuron for its time series
+    """
+    neurons, time = data.shape
+
+    fig, axs = plt.subplots(2, 2, figsize=(12, 8), 
+                             gridspec_kw={'height_ratios':[2,1]})
+    
+    # --- Heatmap (top, spanning both columns) ---
+    ax_hm = axs[0, 0]
+    axs[0, 1].remove()  # remove top-right panel, heatmap spans both columns
+    im = ax_hm.imshow(data, aspect='auto', cmap='viridis', origin='lower')
+    ax_hm.set_title("Spatio-temporal Activity")
+    ax_hm.set_xlabel("Time")
+    ax_hm.set_ylabel("Neuron Index")
+
+    # Overlay red lines
+    ax_hm.axvline(time_idx, color='blue', linestyle='--', lw=2)
+    ax_hm.axhline(neuron_idx, color='blue', linestyle='--', lw=2)
+
+    # Add colorbar
+    cbar = fig.colorbar(im, ax=ax_hm, orientation='vertical', fraction=0.02, pad=0.04)
+    cbar.set_label("Activity / Voltage")
+
+    # --- Snapshot across neurons (fixed time) ---
+    ax_snap = axs[1, 0]
+    ax_snap.plot(np.arange(neurons), data[:, time_idx], color='blue')
+    ax_snap.set_title(f"Snapshot at time = {time_idx}")
+    ax_snap.set_xlabel("Neuron Index")
+    ax_snap.set_ylabel("Activity")
+
+    # --- Time series of fixed neuron ---
+    ax_time = axs[1, 1]
+    ax_time.plot(np.arange(time), data[neuron_idx, :], color='blue')
+    ax_time.set_title(f"Neuron {neuron_idx} over time")
+    ax_time.set_xlabel("Time")
+    ax_time.set_ylabel("Activity")
+
+    plt.tight_layout()
+    plt.show()
+
+def plot_fixed_views(data, time_idx=10, neuron_idx=20):
+    """
+    Plots two views of spatio-temporal data:
+    1. Activity across neurons at a fixed time.
+    2. Activity over time for a fixed neuron.
+
+    Parameters:
+    - data: np.ndarray of shape (neurons, time)
+    - time_idx: int, index of the time step for snapshot across neurons
+    - neuron_idx: int, index of the neuron for its time series
+    """
+    fig, axs = plt.subplots(1, 2, figsize=(12, 4))
+
+    # Plot snapshot at fixed time (across neurons)
+    axs[0].plot(np.arange(data.shape[0]), data[:, time_idx], marker='o')
+    axs[0].set_title(f"Snapshot at time = {time_idx}")
+    axs[0].set_xlabel("Neuron Index")
+    axs[0].set_ylabel("Activity / Voltage")
+
+    # Plot time series of a fixed neuron
+    axs[1].plot(np.arange(data.shape[1]), data[neuron_idx, :])
+    axs[1].set_title(f"Neuron {neuron_idx} over time")
+    axs[1].set_xlabel("Time")
+    axs[1].set_ylabel("Activity / Voltage")
+
+    plt.tight_layout()
+    plt.show()
+
 def plot_animate_1d(data1, theta,data2=None):
     """
     Animates the time evolution of activity data1 (u(x,t)) and optional inputs data2.
@@ -193,7 +271,7 @@ def heatmap_1D_adj_2(data1, data2, G, time, fixed_timestep=0):
     axs[0].set_xlabel('Time t [s]')
     axs[0].set_ylabel('Space x [m]')
     plt.colorbar(im1, ax=axs[0])
-    t = 4500
+    t = 45
     # Plot data1 at fixed timestep vs neuron location
     axs[1].plot(G, data1[:, 0], color='blue')
     axs[1].set_title(f'Snapshot at t = {time[0]:.2f} [s]')
@@ -202,8 +280,8 @@ def heatmap_1D_adj_2(data1, data2, G, time, fixed_timestep=0):
     axs[1].grid(True)
 
     # Plot data2 at last timestep vs neuron location
-    axs[2].plot(G, data1[:, t-1000], color='blue')
-    axs[2].set_title(f'Snapshot at t = {time[t-1000]:.3f} [s]')
+    axs[2].plot(G, data1[:, t-10], color='blue')
+    axs[2].set_title(f'Snapshot at t = {time[t-100]:.3f} [s]')
     axs[2].set_xlabel('Space x [m]')
     axs[2].set_ylabel('Voltage [V]')
     axs[2].grid(True)
