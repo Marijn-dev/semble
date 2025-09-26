@@ -213,6 +213,7 @@ class Gaussian1D(SequenceGenerator):
         return np.ones([n_control_vals, len(self.x)]) * 0
 
 class LIF_input(SequenceGenerator):
+    
     def __init__(self,step,magnitudes,period,dim,amplitude,std,rng=None):
         super().__init__(dim, rng)
         self.step = step
