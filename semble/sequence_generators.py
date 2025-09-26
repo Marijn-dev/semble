@@ -226,15 +226,13 @@ class LIF_input(SequenceGenerator):
     def _sample_impl(self,time_range,delta):
         n_control_vals = int(1+np.floor((time_range[1] - time_range[0]) / delta))
         n_amplitude_vals = int(np.ceil(n_control_vals / self._period))
+        amp_seq = np.zeros(shape=(n_amplitude_vals, self.dim))
 
         if self.step:
             mask_amp_seq = self._rng.uniform(low=self._min,
                                 high=self._max,
                                 size=(n_amplitude_vals, 1)) 
-            # Initialize a new array of zeros
-            amp_seq = np.zeros(shape=(n_amplitude_vals, self.dim))
 
-            # Select random starting positions for the 20-neuron segments
             for i in range(n_amplitude_vals):
                 # Randomly choose a starting index for the std-neuron segment
                 start_idx = numpy.random.randint(0, self.dim - self.std)
@@ -245,7 +243,6 @@ class LIF_input(SequenceGenerator):
             neuron_indices = np.arange(self.dim)
             mu = numpy.random.randint(low=neuron_indices[0], high=neuron_indices[-1], size=n_amplitude_vals) # random neuron locations
             magnitude = numpy.random.uniform(low=self._min, high=self._max, size=n_amplitude_vals) # random magnitudes
-            amp_seq = np.zeros(shape=(n_amplitude_vals, self.dim))
             for i,mean in enumerate(mu):
                 distance = np.minimum(
                     np.abs(neuron_indices - mean),
