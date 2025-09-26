@@ -213,7 +213,7 @@ class Gaussian1D(SequenceGenerator):
         return np.ones([n_control_vals, len(self.x)]) * 0
 
 class LIF_input(SequenceGenerator):
-    
+
     def __init__(self,step,magnitudes,period,dim,amplitude,std,rng=None):
         super().__init__(dim, rng)
         self.step = step
@@ -241,7 +241,7 @@ class LIF_input(SequenceGenerator):
                 # Set the std consecutive neurons to the original random value
                 amp_seq[i, 0:] = mask_amp_seq[i, 0]  # Use the random value from t
 
-        else:
+        else: # guassian over space
             neuron_indices = np.arange(self.dim)
             mu = numpy.random.randint(low=neuron_indices[0], high=neuron_indices[-1], size=n_amplitude_vals) # random neuron locations
             magnitude = numpy.random.uniform(low=self._min, high=self._max, size=n_amplitude_vals) # random magnitudes
