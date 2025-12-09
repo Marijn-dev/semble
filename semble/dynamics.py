@@ -55,11 +55,9 @@ class ParameterisedDynamics(Dynamics):
     """Adds randomization of the parameter (θ) of the dynamics."""
     def __init__(
             self,
-            state_dim: int,
-            control_dim: int,
-            mask: Mask | None = None,
+            *args
         ): 
-            super().__init__(state_dim,control_dim,mask) 
+            super().__init__(*args) # pass arguments to dynamics
 
     # Set and return random parameter 
     def gen_parameter(self, rng: Generator) -> NDArray:
