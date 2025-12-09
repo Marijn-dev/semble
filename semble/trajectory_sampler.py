@@ -31,7 +31,7 @@ class TrajectorySampler:
         )
 
         self._rng = np.random.default_rng(seed=seed)
-        self._seq_gen_rng, self._ist_rng = self._rng.spawn(2)
+        self._seq_gen_rng, self._ist_rng, self._param_rng = self._rng.spawn(3)
 
         self._init_time = 0.0
 
@@ -40,7 +40,7 @@ class TrajectorySampler:
 
     def reset_rngs(self, seed: int | None = None):
         self._rng = np.random.default_rng(seed=seed)
-        self._seq_gen_rng, self._ist_rng = self._rng.spawn(2)
+        self._seq_gen_rng, self._ist_rng, self._param_rng = self._rng.spawn(3)
 
     def get_time_samples(
         self,
@@ -75,24 +75,25 @@ class TrajectorySampler:
             rng=self._seq_gen_rng,
         )
 
-        return x0, u
+        parameter = self._dyn.gen_parameter(self._param_rng) # set random parameter
+
+        return x0, u, parameter
 
     def get_example(
         self,
         time_horizon: float,
         n_samples: int,
         time_sample_method: Literal["lhs", "linspace"] = "lhs",
-    ) -> tuple[NDArray, NDArray, NDArray, NDArray]:
+    ) -> tuple[NDArray, NDArray, NDArray, NDArray,NDArray]:
         t_samples = self.get_time_samples(
             time_horizon, n_samples, time_sample_method
         )
 
-        x0, u = self.sample_features(time_horizon)
+        x0, u, parameter = self.sample_features(time_horizon)
 
         def f(t, y):
             n_control = int(np.floor((t - self._init_time) / self._delta))
             u_val = u[n_control]  # get u(t)
-
             return self._dyn(y, u_val)
 
         traj = solve_ivp(
@@ -106,7 +107,7 @@ class TrajectorySampler:
         x_traj = traj.y.T
         t = traj.t.reshape(-1, 1)
 
-        return x0, t, x_traj, u
+        return x0, t, x_traj, u, parameter
 
 
 def lhs(n_samples: int, rng: np.random.Generator) -> NDArray:

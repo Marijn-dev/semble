@@ -1,12 +1,12 @@
 import numpy as np
 from . import initial_state
+from numpy.random import Generator
 
 from numpy.typing import ArrayLike, NDArray
 from typing import Any
 
 Dims = tuple[int, int, int]
 Mask = tuple[int, ...]
-
 
 class Dynamics:
     n: int
@@ -51,6 +51,22 @@ class Dynamics:
         return (self.n, self.m, self.p)
 
 
+class ParameterisedDynamics(Dynamics):
+    """Adds randomization of the parameter (θ) of the dynamics."""
+    def __init__(
+            self,
+            state_dim: int,
+            control_dim: int,
+            mask: Mask | None = None,
+        ): 
+            super().__init__(state_dim,control_dim,mask) 
+
+    # Set and return random parameter 
+    def gen_parameter(self, rng: Generator) -> NDArray:
+        self._set_parameter(rng)
+        return self._get_parameter()
+    
+
 class ContinuousStateDynamics(Dynamics):
     def get_space_axis(self) -> NDArray:
         raise NotImplementedError
@@ -84,6 +100,27 @@ class VanDerPol(Dynamics):
 
         return (dp, dv)
 
+
+class VanDerPolParameterised(ParameterisedDynamics):
+    def __init__(self, low: float = 0.0, high: float = 1.0):
+        super().__init__(2, 1)
+
+        self.low = low
+        self.high = high
+
+    def _set_parameter(self, rng):
+        self.parameter = rng.uniform(self.low, self.high)
+    
+    def _get_parameter(self):
+        return np.array(self.parameter)
+    
+    def _dx(self, x, u):
+        p, v = x
+
+        dp = v
+        dv = -p + self.parameter * (1 - p**2) * v + u.item()
+        return (dp, dv)
+    
 
 class FitzHughNagumo(Dynamics):
     def __init__(self, tau: float, a: float, b: float):
@@ -481,6 +518,7 @@ class TwoTank(Dynamics):
 _dynamics_names = {
     "LinearSys": LinearSys,
     "VanDerPol": VanDerPol,
+    "VanDerPolParameterised": VanDerPolParameterised,
     "FitzHughNagumo": FitzHughNagumo,
     "Pendulum": Pendulum,
     "HodgkinHuxleyFS": HodgkinHuxleyFS,
