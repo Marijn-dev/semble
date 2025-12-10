@@ -1,6 +1,8 @@
 import numpy as np
-from . import initial_state
+from . import initial_state, parameter_generators
 from numpy.random import Generator
+
+
 
 from numpy.typing import ArrayLike, NDArray
 from typing import Any
@@ -27,6 +29,9 @@ class Dynamics:
         self.p = sum(self.mask)
 
         self._method = "RK45"
+
+        ### should this one have a boolean _is_parameterised so that you can check in flumen if its parameterised? 
+        ### for ex, can be done by checking if paramterisedDynamics is its child
 
     def __call__(self, x: NDArray, u: NDArray) -> ArrayLike:
         return self._dx(x, u)
@@ -55,12 +60,18 @@ class ParameterisedDynamics(Dynamics):
     """Adds randomization of the parameter (θ) of the dynamics."""
     def __init__(
             self,
+            parameter_generator,
             *args
         ): 
-            super().__init__(*args) # pass arguments to dynamics
+            super().__init__(*args) # pass arguments to Dynamics
+
+            self._parameter_generator = parameter_generators.get_parameter_generator(
+                parameter_generator['name'],
+                parameter_generator['args']
+            )
 
     # Set and return random parameter 
-    def gen_parameter(self, rng: Generator) -> NDArray:
+    def gen_parameter(self, rng) -> NDArray:
         self._set_parameter(rng)
         return self._get_parameter()
     
@@ -85,7 +96,7 @@ class LinearSys(Dynamics):
 
 
 class VanDerPol(Dynamics):
-    def __init__(self, damping: float):
+    def __init__(self, damping: float = None):
         super().__init__(2, 1)
 
         self.damping = damping
@@ -98,28 +109,23 @@ class VanDerPol(Dynamics):
 
         return (dp, dv)
 
-
 class VanDerPolParameterised(ParameterisedDynamics):
-    def __init__(self, low: float = 0.0, high: float = 1.0):
-        super().__init__(2, 1)
+    def __init__(self, parameter_generator: dict = None):
+        super().__init__(parameter_generator,2, 1)
 
-        self.low = low
-        self.high = high
+        self.dynamics = VanDerPol() # Use VanDerPol Dynamics
 
     def _set_parameter(self, rng):
-        self.parameter = rng.uniform(self.low, self.high)
-    
+        parameter = self._parameter_generator.sample(rng)[0] # generate the parameter 
+        self.dynamics.damping = parameter                    # use this parameter in the VanDerPol Dynamics
+
     def _get_parameter(self):
-        return np.array(self.parameter)
-    
-    def _dx(self, x, u):
-        p, v = x
+        return self.dynamics.damping 
 
-        dp = v
-        dv = -p + self.parameter * (1 - p**2) * v + u.item()
-        return (dp, dv)
+    def _dx(self,x,u):
+        return self.dynamics._dx(x,u) # reuse differential equation of VanDerPol here
+        
     
-
 class FitzHughNagumo(Dynamics):
     def __init__(self, tau: float, a: float, b: float):
         super().__init__(2, 1)

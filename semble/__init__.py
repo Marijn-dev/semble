@@ -4,4 +4,4 @@ from .trajectory_sampler import (
     TSamplerSpec,
 )
 
-from . import dynamics, sequence_generators, initial_state
+from . import dynamics, sequence_generators, initial_state, parameter_generators
