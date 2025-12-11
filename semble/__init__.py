@@ -1,5 +1,6 @@
 from .trajectory_sampler import (
     TrajectorySampler,
+    ParameterisedTrajectorySampler,
     make_trajectory_sampler,
     TSamplerSpec,
 )
