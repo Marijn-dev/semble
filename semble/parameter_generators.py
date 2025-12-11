@@ -24,7 +24,7 @@ class ParameterGenerator:
         raise NotImplementedError 
     
 class Uniform(ParameterGenerator):
-    def __init__(self, low, high, dim):
+    def __init__(self, low, high, dim=1):
         super().__init__(dim)
 
         self._low = low

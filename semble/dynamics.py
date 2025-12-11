@@ -15,12 +15,14 @@ class Dynamics:
     m: int
     p: int
     mask: Mask
+    is_parameterised: bool
 
     def __init__(
         self,
         state_dim: int,
         control_dim: int,
         mask: Mask | None = None,
+        is_parameterised: bool = False
     ):
         self.n = state_dim
         self.m = control_dim
@@ -29,9 +31,8 @@ class Dynamics:
         self.p = sum(self.mask)
 
         self._method = "RK45"
-
-        ### should this one have a boolean _is_parameterised so that you can check in flumen if its parameterised? 
-        ### for ex, can be done by checking if paramterisedDynamics is its child
+        
+        self._is_parameterised = is_parameterised
 
     def __call__(self, x: NDArray, u: NDArray) -> ArrayLike:
         return self._dx(x, u)
@@ -61,9 +62,11 @@ class ParameterisedDynamics(Dynamics):
     def __init__(
             self,
             parameter_generator,
-            *args
+            state_dim,
+            control_dim,
+            mask: Mask | None = None,
         ): 
-            super().__init__(*args) # pass arguments to Dynamics
+            super().__init__(state_dim, control_dim, mask, True) # pass arguments to Dynamics, is_parameterised = True
 
             self._parameter_generator = parameter_generators.get_parameter_generator(
                 parameter_generator['name'],
@@ -116,11 +119,11 @@ class VanDerPolParameterised(ParameterisedDynamics):
         self.dynamics = VanDerPol() # Use VanDerPol Dynamics
 
     def _set_parameter(self, rng):
-        parameter = self._parameter_generator.sample(rng)[0] # generate the parameter 
-        self.dynamics.damping = parameter                    # use this parameter in the VanDerPol Dynamics
-
+        self._parameter = self._parameter_generator.sample(rng)
+        self.dynamics.damping = self._parameter[0]     
+        
     def _get_parameter(self):
-        return self.dynamics.damping 
+        return self._parameter
 
     def _dx(self,x,u):
         return self.dynamics._dx(x,u) # reuse differential equation of VanDerPol here
