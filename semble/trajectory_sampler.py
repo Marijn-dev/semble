@@ -110,6 +110,7 @@ class TrajectorySampler:
 
         return x0, t, x_traj, u
 
+
 class ParameterisedTrajectorySampler(TrajectorySampler):
     def __init__(
         self,
@@ -134,12 +135,16 @@ class ParameterisedTrajectorySampler(TrajectorySampler):
         time_horizon: float,
         n_samples: int,
         time_sample_method: Literal["lhs", "linspace"] = "lhs",
-    ) -> tuple[NDArray, NDArray, NDArray, NDArray,NDArray]:
-    
-        parameter = self._dyn.gen_parameter(self._param_rng) # Set and return parameter
+    ) -> tuple[NDArray, NDArray, NDArray, NDArray, NDArray]:
+        parameter = self._dyn.gen_parameter(
+            self._param_rng
+        )  # Set and return parameter
 
-        return *super().get_example(time_horizon, n_samples,time_sample_method), parameter
-    
+        return *super().get_example(
+            time_horizon, n_samples, time_sample_method
+        ), parameter
+
+
 def lhs(n_samples: int, rng: np.random.Generator) -> NDArray:
     """Performs Latin Hypercube sampling on the unit interval."""
     bins_start_val = np.linspace(0.0, 1.0, n_samples + 1)[:-1]
@@ -169,7 +174,7 @@ class TSamplerSpec(TypedDict):
 
 def make_trajectory_sampler(args: TSamplerSpec) -> TrajectorySampler:
     dynamics = get_dynamics(args["dynamics"]["name"], args["dynamics"]["args"])
-    
+
     sequence_generator = get_sequence_generator(
         args["sequence_generator"]["name"],
         args["sequence_generator"]["args"],
@@ -191,7 +196,7 @@ def make_trajectory_sampler(args: TSamplerSpec) -> TrajectorySampler:
             method=args.get("method"),
             initial_state_generator=init_state_gen,
         )
-    else: 
+    else:
         sampler = TrajectorySampler(
             dynamics=dynamics,
             control_delta=args["control_delta"],

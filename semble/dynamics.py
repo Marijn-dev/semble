@@ -1,7 +1,5 @@
 import numpy as np
 from . import initial_state, parameter_generators
-from numpy.random import Generator
-
 
 
 from numpy.typing import ArrayLike, NDArray
@@ -9,6 +7,7 @@ from typing import Any
 
 Dims = tuple[int, int, int]
 Mask = tuple[int, ...]
+
 
 class Dynamics:
     n: int
@@ -22,7 +21,7 @@ class Dynamics:
         state_dim: int,
         control_dim: int,
         mask: Mask | None = None,
-        is_parameterised: bool = False
+        is_parameterised: bool = False,
     ):
         self.n = state_dim
         self.m = control_dim
@@ -31,7 +30,7 @@ class Dynamics:
         self.p = sum(self.mask)
 
         self._method = "RK45"
-        
+
         self._is_parameterised = is_parameterised
 
     def __call__(self, x: NDArray, u: NDArray) -> ArrayLike:
@@ -59,25 +58,29 @@ class Dynamics:
 
 class ParameterisedDynamics(Dynamics):
     """Adds randomization of the parameter (θ) of the dynamics."""
+
     def __init__(
-            self,
-            parameter_generator,
-            state_dim,
-            control_dim,
-            mask: Mask | None = None,
-        ): 
-            super().__init__(state_dim, control_dim, mask, True) # pass arguments to Dynamics, is_parameterised = True
+        self,
+        parameter_generator,
+        state_dim,
+        control_dim,
+        mask: Mask | None = None,
+    ):
+        super().__init__(
+            state_dim, control_dim, mask, True
+        )  # pass arguments to Dynamics, is_parameterised = True
 
-            self._parameter_generator = parameter_generators.get_parameter_generator(
-                parameter_generator['name'],
-                parameter_generator['args']
+        self._parameter_generator = (
+            parameter_generators.get_parameter_generator(
+                parameter_generator["name"], parameter_generator["args"]
             )
+        )
 
-    # Set and return random parameter 
+    # Set and return random parameter
     def gen_parameter(self, rng) -> NDArray:
         self._set_parameter(rng)
         return self._get_parameter()
-    
+
 
 class ContinuousStateDynamics(Dynamics):
     def get_space_axis(self) -> NDArray:
@@ -112,23 +115,26 @@ class VanDerPol(Dynamics):
 
         return (dp, dv)
 
+
 class VanDerPolParameterised(ParameterisedDynamics):
     def __init__(self, parameter_generator: dict = None):
-        super().__init__(parameter_generator,2, 1)
+        super().__init__(parameter_generator, 2, 1)
 
-        self.dynamics = VanDerPol() # Use VanDerPol Dynamics
+        self.dynamics = VanDerPol()  # Use VanDerPol Dynamics
 
     def _set_parameter(self, rng):
         self._parameter = self._parameter_generator.sample(rng)
-        self.dynamics.damping = self._parameter[0]     
-        
+        self.dynamics.damping = self._parameter[0]
+
     def _get_parameter(self):
         return self._parameter
 
-    def _dx(self,x,u):
-        return self.dynamics._dx(x,u) # reuse differential equation of VanDerPol here
-        
-    
+    def _dx(self, x, u):
+        return self.dynamics._dx(
+            x, u
+        )  # reuse differential equation of VanDerPol here
+
+
 class FitzHughNagumo(Dynamics):
     def __init__(self, tau: float, a: float, b: float):
         super().__init__(2, 1)
