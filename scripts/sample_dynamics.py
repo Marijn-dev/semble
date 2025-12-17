@@ -1,4 +1,5 @@
-import argparse, sys
+import argparse
+import sys
 
 import semble
 
@@ -31,12 +32,18 @@ def main(args):
     plt.ion()
 
     while True:
-        _, t, y, u, parameter = sampler.get_example(
-            args.time_horizon,
-            n_samples=int(10 * args.time_horizon),
-            time_sample_method="linspace",
-        )
-
+        if sampler._dyn._is_parameterised:
+            _, t, y, u, parameter = sampler.get_example(
+                args.time_horizon,
+                n_samples=int(10 * args.time_horizon),
+                time_sample_method="linspace",
+            )
+        else:
+            _, t, y, u = sampler.get_example(
+                args.time_horizon,
+                n_samples=int(10 * args.time_horizon),
+                time_sample_method="linspace",
+            )
 
         if not args.continuous_state:
             for k in range(n_plots - 1):
@@ -51,8 +58,8 @@ def main(args):
             u[:-1],
             where="post",
         )
-
-        ax[0].set_title(r"$\theta = {:.2f}$".format(parameter.item()))
+        if sampler._dyn._is_parameterised:
+            ax[0].set_title(r"$\theta = {:.2f}$".format(parameter.item()))
         ax[-1].set_ylabel(r"$u$")
         ax[-1].set_xlabel(r"$t$")
         plt.draw()
