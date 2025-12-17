@@ -36,7 +36,7 @@ initial_state_generator:
   args:
     n: 2
 ```
-or alternatively, the following for varying parameter per trajectory:
+or alternatively, the following yaml file for a varying parameter per sampled trajectory:
 ```yaml
 dynamics:
   name: VanDerPolParamaterised
@@ -58,7 +58,7 @@ initial_state_generator:
 ```
 defines a Van der Pol system with control amplitudes sampled from a standard
 normal distribution every 0.5 seconds, initial state sampled from a standard
-normal distribution, and depending on the configuration, a parameter of 1.0 or uniformly sampled between 0.0 and 2.0.
+normal distribution, and, depending on the configuration, a parameter of 1.0 or uniformly sampled between 0.0 and 2.0.
 If we save its contents as `example_vdp_spec.yaml`, we can sample and plot the
 resulting trajectories by running
 ```sh
