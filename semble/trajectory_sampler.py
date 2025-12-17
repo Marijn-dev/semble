@@ -49,9 +49,9 @@ class TrajectorySampler:
         method: Literal["lhs", "linspace"],
     ) -> NDArray:
         if method == "lhs":
-            t_samples = self._init_time + (
-                time_horizon - self._init_time
-            ) * lhs(n_samples, self._rng)
+            t_samples = self._init_time + (time_horizon - self._init_time) * lhs(
+                n_samples, self._rng
+            )
             t_samples = np.sort(np.append(t_samples, [self._init_time]))
 
         elif method == "linspace":
@@ -60,8 +60,7 @@ class TrajectorySampler:
             )
         else:
             raise ValueError(
-                "Unsupported value for 'method' "
-                "(should be one of 'lhs', 'linspace')"
+                "Unsupported value for 'method' (should be one of 'lhs', 'linspace')"
             )
 
         return t_samples
@@ -83,13 +82,8 @@ class TrajectorySampler:
         n_samples: int,
         time_sample_method: Literal["lhs", "linspace"] = "lhs",
     ) -> tuple[NDArray, NDArray, NDArray, NDArray]:
-        t_samples = self.get_time_samples(
-            time_horizon, n_samples, time_sample_method
-        )
+        t_samples = self.get_time_samples(time_horizon, n_samples, time_sample_method)
 
-        # new class ParameterisedTrajectorySampler
-        # first sample parameter and hten you can re-use trajectory_sampler
-        # return outputs of get_exmaple and then add parameter
         x0, u = self.sample_features(time_horizon)
 
         def f(t, y):
@@ -136,9 +130,7 @@ class ParameterisedTrajectorySampler(TrajectorySampler):
         n_samples: int,
         time_sample_method: Literal["lhs", "linspace"] = "lhs",
     ) -> tuple[NDArray, NDArray, NDArray, NDArray, NDArray]:
-        parameter = self._dyn.gen_parameter(
-            self._param_rng
-        )  # Set and return parameter
+        parameter = self._dyn.gen_parameter(self._param_rng)  # Set and return parameter
 
         return *super().get_example(
             time_horizon, n_samples, time_sample_method
@@ -148,15 +140,18 @@ class ParameterisedTrajectorySampler(TrajectorySampler):
 def lhs(n_samples: int, rng: np.random.Generator) -> NDArray:
     """Performs Latin Hypercube sampling on the unit interval."""
     bins_start_val = np.linspace(0.0, 1.0, n_samples + 1)[:-1]
-    samples = (
-        rng.uniform(size=(n_samples,)) / n_samples
-    )  # sample a delta for each bin
+    samples = rng.uniform(size=(n_samples,)) / n_samples  # sample a delta for each bin
     return bins_start_val + samples
+
+
+class ParameterGeneratorSpec(TypedDict):
+    name: str
+    args: Args | list[Args]
 
 
 class SpecEntry(TypedDict):
     name: str
-    args: Args
+    args: Args | ParameterGeneratorSpec
 
 
 class SequenceGeneratorSpec(TypedDict):
