@@ -16,7 +16,7 @@ text format.
 
 An example of how to use the package is provided in
 [scripts/sample_dynamics.py](scripts/sample_dynamics.py).
-A `TrajectorySampler` object may be created using the helper function
+Depending on the desired configuration, a `TrajectorySampler` or `ParameterisedTrajectorySampler` object can be created using the helper function
 `make_trajectory_sampler` which takes a `TSamplerSpec` type dictionary.
 This can be created using any format which may be read into a Python `dict`,
 as long as the fields conform to the definition of `TSamplerSpec`.
@@ -36,9 +36,29 @@ initial_state_generator:
   args:
     n: 2
 ```
+or alternatively, the following for varying parameter per trajectory:
+```yaml
+dynamics:
+  name: VanDerPolParamaterised
+  args:
+    parameter_generator: 
+      name: Uniform
+      args:
+        low: 0.0
+        high: 2.0 
+sequence_generator:
+  name: GaussianSqWave
+  args:
+    period: 1
+control_delta: 0.5
+initial_state_generator:
+  name: GaussianInitialState
+  args:
+    n: 2
+```
 defines a Van der Pol system with control amplitudes sampled from a standard
-normal distribution every 0.5 seconds, and initial state sampled from a standard
-normal distribution.
+normal distribution every 0.5 seconds, initial state sampled from a standard
+normal distribution, and depending on the configuration, a parameter of 1.0 or uniformly sampled between 0.0 and 2.0.
 If we save its contents as `example_vdp_spec.yaml`, we can sample and plot the
 resulting trajectories by running
 ```sh
