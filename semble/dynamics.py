@@ -70,15 +70,13 @@ class ParameterisedDynamics(Dynamics):
             state_dim, control_dim, mask, True
         )  # pass arguments to Dynamics, is_parameterised = True
 
-        self._parameter_generator = (
-            parameter_generators.get_parameter_generator(
-                parameter_generator["name"], parameter_generator["args"]
-            )
+        self._parameter_generator = parameter_generators.get_parameter_generator(
+            parameter_generator["name"], parameter_generator["args"]
         )
 
-    # Set and return random parameter
-    def gen_parameter(self, rng) -> NDArray:
-        self._set_parameter(rng)
+    # Set and return random parameter unless parameter is given
+    def gen_parameter(self, rng, parameter: NDArray | None = None) -> NDArray:
+        self._set_parameter(rng, parameter)
         return self._get_parameter()
 
 
@@ -122,17 +120,18 @@ class VanDerPolParameterised(ParameterisedDynamics):
 
         self.dynamics = VanDerPol()  # Use VanDerPol Dynamics
 
-    def _set_parameter(self, rng):
-        self._parameter = self._parameter_generator.sample(rng)
+    def _set_parameter(self, rng, parameter):
+        if parameter is None:
+            self._parameter = self._parameter_generator.sample(rng)
+        else:
+            self._parameter = parameter
         self.dynamics.damping = self._parameter[0]
 
     def _get_parameter(self):
         return self._parameter
 
     def _dx(self, x, u):
-        return self.dynamics._dx(
-            x, u
-        )  # reuse differential equation of VanDerPol here
+        return self.dynamics._dx(x, u)  # reuse differential equation of VanDerPol here
 
 
 class FitzHughNagumo(Dynamics):
@@ -207,23 +206,13 @@ class HodgkinHuxleyFS(Dynamics):
         ) / (100.0 * self.c_m)
 
         a_n = (
-            -0.032
-            * (v - self.v_t - 15.0)
-            / (np.exp(-(v - self.v_t - 15.0) / 5.0) - 1)
+            -0.032 * (v - self.v_t - 15.0) / (np.exp(-(v - self.v_t - 15.0) / 5.0) - 1)
         )
         b_n = 0.5 * np.exp(-(v - self.v_t - 10.0) / 40.0)
         dn = a_n * (1.0 - n) - b_n * n
 
-        a_m = (
-            -0.32
-            * (v - self.v_t - 13.0)
-            / (np.exp(-(v - self.v_t - 13.0) / 4.0) - 1)
-        )
-        b_m = (
-            0.28
-            * (v - self.v_t - 40.0)
-            / (np.exp((v - self.v_t - 40.0) / 5.0) - 1)
-        )
+        a_m = -0.32 * (v - self.v_t - 13.0) / (np.exp(-(v - self.v_t - 13.0) / 4.0) - 1)
+        b_m = 0.28 * (v - self.v_t - 40.0) / (np.exp((v - self.v_t - 40.0) / 5.0) - 1)
         dm = a_m * (1.0 - m) - b_m * m
 
         a_h = 0.128 * np.exp(-(v - self.v_t - 17.0) / 18.0)
@@ -280,23 +269,13 @@ class HodgkinHuxleyRSA(Dynamics):
         dp = (1.0 / (1 + np.exp(-(v + 35) / 10.0)) - p) / t_p
 
         a_n = (
-            -0.032
-            * (v - self.v_t - 15.0)
-            / (np.exp(-(v - self.v_t - 15.0) / 5.0) - 1)
+            -0.032 * (v - self.v_t - 15.0) / (np.exp(-(v - self.v_t - 15.0) / 5.0) - 1)
         )
         b_n = 0.5 * np.exp(-(v - self.v_t - 10.0) / 40.0)
         dn = a_n * (1.0 - n) - b_n * n
 
-        a_m = (
-            -0.32
-            * (v - self.v_t - 13.0)
-            / (np.exp(-(v - self.v_t - 13.0) / 4.0) - 1)
-        )
-        b_m = (
-            0.28
-            * (v - self.v_t - 40.0)
-            / (np.exp((v - self.v_t - 40.0) / 5.0) - 1)
-        )
+        a_m = -0.32 * (v - self.v_t - 13.0) / (np.exp(-(v - self.v_t - 13.0) / 4.0) - 1)
+        b_m = 0.28 * (v - self.v_t - 40.0) / (np.exp((v - self.v_t - 40.0) / 5.0) - 1)
         dm = a_m * (1.0 - m) - b_m * m
 
         a_h = 0.128 * np.exp(-(v - self.v_t - 17.0) / 18.0)
@@ -364,32 +343,20 @@ class HodgkinHuxleyIB(Dynamics):
         ds = a_s * (1.0 - s) - b_s * s
 
         a_n = (
-            -0.032
-            * (v - self.v_t - 15.0)
-            / (np.exp(-(v - self.v_t - 15.0) / 5.0) - 1)
+            -0.032 * (v - self.v_t - 15.0) / (np.exp(-(v - self.v_t - 15.0) / 5.0) - 1)
         )
         b_n = 0.5 * np.exp(-(v - self.v_t - 10.0) / 40.0)
         dn = a_n * (1.0 - n) - b_n * n
 
-        a_m = (
-            -0.32
-            * (v - self.v_t - 13.0)
-            / (np.exp(-(v - self.v_t - 13.0) / 4.0) - 1)
-        )
-        b_m = (
-            0.28
-            * (v - self.v_t - 40.0)
-            / (np.exp((v - self.v_t - 40.0) / 5.0) - 1)
-        )
+        a_m = -0.32 * (v - self.v_t - 13.0) / (np.exp(-(v - self.v_t - 13.0) / 4.0) - 1)
+        b_m = 0.28 * (v - self.v_t - 40.0) / (np.exp((v - self.v_t - 40.0) / 5.0) - 1)
         dm = a_m * (1.0 - m) - b_m * m
 
         a_h = 0.128 * np.exp(-(v - self.v_t - 17.0) / 18.0)
         b_h = 4.0 / (1.0 + np.exp(-(v - self.v_t - 40.0) / 5.0))
         dh = a_h * (1.0 - h) - b_h * h
 
-        return tuple(
-            self.time_scale * dx for dx in (dv, dp, dq, ds, dn, dm, dh)
-        )
+        return tuple(self.time_scale * dx for dx in (dv, dp, dq, ds, dn, dm, dh))
 
 
 class HodgkinHuxleyFFE(Dynamics):

@@ -101,7 +101,6 @@ class TrajectorySampler:
 
         x_traj = traj.y.T
         t = traj.t.reshape(-1, 1)
-
         return x0, t, x_traj, u
 
 
@@ -129,8 +128,11 @@ class ParameterisedTrajectorySampler(TrajectorySampler):
         time_horizon: float,
         n_samples: int,
         time_sample_method: Literal["lhs", "linspace"] = "lhs",
+        parameter: NDArray | None = None,
     ) -> tuple[NDArray, NDArray, NDArray, NDArray, NDArray]:
-        parameter = self._dyn.gen_parameter(self._param_rng)  # Set and return parameter
+        parameter = self._dyn.gen_parameter(
+            self._param_rng, parameter
+        )  # Set and return parameter
 
         return *super().get_example(
             time_horizon, n_samples, time_sample_method
