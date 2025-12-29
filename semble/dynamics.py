@@ -109,7 +109,9 @@ class VanDerPol(Dynamics):
         p, v = x
 
         dp = v
-        dv = -p + self.damping * (1 - p**2) * v + u.item()
+        dv = (
+            -p + self.damping * (1 - p**2) * v + u[0]
+        )  # u[0] instead of u.item() to facilitate jit compilation
 
         return (dp, dv)
 
