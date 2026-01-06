@@ -66,6 +66,39 @@ python scripts/sample_dynamics.py example_vdp_spec.yaml 15
 ```
 where the second argument is the time length of the trajectories.
 
+To change multiple parameters per trajectory, a list of parameter generators can be used. For example, to change multiple parameters in the Fitzhugh Nagumo dynamics, this would look like the following:
+```yaml
+dynamics:
+  name: FitzHughNagumoParameterised
+  args:
+    parameter_generator:
+      name: Product
+      args:
+        # tau
+        - name: Uniform 
+          args:
+            low: 0.65
+            high: 0.95
+        # a
+        - name: Uniform
+          args: 
+            low: -0.40
+            high: -0.20
+        # b
+        - name: Uniform
+          args: 
+            low: 1.0
+            high: 1.8
+sequence_generator:
+  name: LogNormalSqWave
+  args:
+    mean: -0.7
+    std: 0.5
+    period: 8
+
+control_delta: 0.2
+```
+
 ## Scope
 
 The list of available dynamical systems is in [semble/dynamics.py](semble/dynamics.py).
