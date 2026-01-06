@@ -100,7 +100,7 @@ class LinearSys(Dynamics):
 
 
 class VanDerPol(Dynamics):
-    def __init__(self, damping: float = None):
+    def __init__(self, damping: float):
         super().__init__(2, 1)
 
         self.damping = damping
@@ -120,7 +120,7 @@ class VanDerPolParameterised(ParameterisedDynamics):
     def __init__(self, parameter_generator: dict = None):
         super().__init__(parameter_generator, 2, 1)
 
-        self.dynamics = VanDerPol()  # Use VanDerPol Dynamics
+        self.dynamics = VanDerPol(None)  # Use VanDerPol Dynamics
 
     def _set_parameter(self, rng, parameter):
         if parameter is None:
@@ -148,10 +148,31 @@ class FitzHughNagumo(Dynamics):
     def _dx(self, x, u):
         v, w = x
 
-        dv = 50 * (v - v**3 - w + u.item())
+        dv = 50 * (v - v**3 - w + u[0])  # u[0] instead of u.item() for jit compilation
         dw = (v - self.a - self.b * w) / self.tau
 
         return (dv, dw)
+
+
+class FitzHughNagumoParameterised(ParameterisedDynamics):
+    def __init__(self, a, b, parameter_generator: dict = None):
+        super().__init__(parameter_generator, 2, 1)
+
+        self._method = "BDF"
+        self.dynamics = FitzHughNagumo(None, a, b)
+
+    def _set_parameter(self, rng, parameter):
+        if parameter is None:
+            self._parameter = self._parameter_generator.sample(rng)
+        else:
+            self._parameter = parameter
+        self.dynamics.tau = self._parameter[0]
+
+    def _get_parameter(self):
+        return self._parameter
+
+    def _dx(self, x, u):
+        return self.dynamics._dx(x, u)
 
 
 class Pendulum(Dynamics):
@@ -502,6 +523,7 @@ _dynamics_names = {
     "VanDerPol": VanDerPol,
     "VanDerPolParameterised": VanDerPolParameterised,
     "FitzHughNagumo": FitzHughNagumo,
+    "FitzHughNagumoParameterised": FitzHughNagumoParameterised,
     "Pendulum": Pendulum,
     "HodgkinHuxleyFS": HodgkinHuxleyFS,
     "HodgkinHuxleyRSA": HodgkinHuxleyRSA,
