@@ -16,7 +16,7 @@ def main(args):
 
     sampler = semble.make_trajectory_sampler(spec)
     sampler.reset_rngs()
-    n_dims = sampler.dims()[-1]
+    n_dims = sampler.dims()[2]
     dynamics = sampler._dyn
 
     if args.continuous_state:
@@ -59,7 +59,8 @@ def main(args):
             where="post",
         )
         if sampler._dyn._is_parameterised:
-            ax[0].set_title(r"$\theta = {:.2f}$".format(parameter.item()))
+            formatted_parameter = ", ".join([f"{x:.2f}" for x in parameter])
+            ax[0].set_title(r"$\theta = {}$".format(formatted_parameter))
         ax[-1].set_ylabel(r"$u$")
         ax[-1].set_xlabel(r"$t$")
         plt.draw()

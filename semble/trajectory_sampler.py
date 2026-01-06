@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 
 from typing import Literal, TypedDict, NotRequired
 
-from .dynamics import Dynamics, Dims, get_dynamics
+from .dynamics import Dynamics, Dims, DimsParam, get_dynamics
 from .sequence_generators import SequenceGenerator, get_sequence_generator, Args
 from .initial_state import InitialStateGenerator, get_initial_state_generator
 
@@ -35,7 +35,7 @@ class TrajectorySampler:
 
         self._init_time = 0.0
 
-    def dims(self) -> Dims:
+    def dims(self) -> Dims | DimsParam:
         return self._dyn.dims()
 
     def reset_rngs(self, seed: int | None = None):
@@ -83,7 +83,6 @@ class TrajectorySampler:
         time_sample_method: Literal["lhs", "linspace"] = "lhs",
     ) -> tuple[NDArray, NDArray, NDArray, NDArray]:
         t_samples = self.get_time_samples(time_horizon, n_samples, time_sample_method)
-
         x0, u = self.sample_features(time_horizon)
 
         def f(t, y):

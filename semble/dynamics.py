@@ -6,6 +6,7 @@ from numpy.typing import ArrayLike, NDArray
 from typing import Any
 
 Dims = tuple[int, int, int]
+DimsParam = tuple[*Dims, int]
 Mask = tuple[int, ...]
 
 
@@ -74,10 +75,13 @@ class ParameterisedDynamics(Dynamics):
             parameter_generator["name"], parameter_generator["args"]
         )
 
-    # Set and return random parameter unless parameter is given
+    # set and return parameter
     def gen_parameter(self, rng, parameter: NDArray | None = None) -> NDArray:
         self._set_parameter(rng, parameter)
         return self._get_parameter()
+
+    def dims(self) -> DimsParam:
+        return (*super().dims(), self._parameter_generator.dim)
 
 
 class ContinuousStateDynamics(Dynamics):
@@ -155,18 +159,32 @@ class FitzHughNagumo(Dynamics):
 
 
 class FitzHughNagumoParameterised(ParameterisedDynamics):
-    def __init__(self, a, b, parameter_generator: dict = None):
+    def __init__(
+        self,
+        tau: float = None,
+        a: float = None,
+        b: float = None,
+        parameter_generator: dict = None,
+    ):
         super().__init__(parameter_generator, 2, 1)
-
         self._method = "BDF"
-        self.dynamics = FitzHughNagumo(None, a, b)
+
+        self.dynamics = FitzHughNagumo(tau, a, b)
+        self._method = self.dynamics._method
 
     def _set_parameter(self, rng, parameter):
         if parameter is None:
             self._parameter = self._parameter_generator.sample(rng)
         else:
             self._parameter = parameter
+
         self.dynamics.tau = self._parameter[0]
+        self.dynamics.a = (
+            self._parameter[1] if len(self._parameter) > 1 else self.dynamics.a
+        )
+        self.dynamics.b = (
+            self._parameter[2] if len(self._parameter) > 2 else self.dynamics.b
+        )
 
     def _get_parameter(self):
         return self._parameter
