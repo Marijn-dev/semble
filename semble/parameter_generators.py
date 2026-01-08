@@ -43,14 +43,24 @@ class Uniform(ParameterGenerator):
         self._low = low
         self._high = high
 
-    def _sample_impl(self, rng) -> NDArray:
+    def _sample_impl(self, rng):
         parameter = rng.uniform(low=self._low, high=self._high, size=self.dim)
         return parameter
 
+class Delta(ParameterGenerator):
+    def __init__(self, value, dim=1):
+        super().__init__(dim)
 
+        self._value = value
+    
+    def _sample_impl(self, rng):
+        parameter = np.full(shape=(self.dim,), fill_value=self._value, dtype=float)
+        return parameter
+    
 # Distributions
 _pargen_names = {
     "Uniform": Uniform,
+    "Delta": Delta,
 }
 
 
