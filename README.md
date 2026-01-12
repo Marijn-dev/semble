@@ -39,7 +39,7 @@ initial_state_generator:
 or alternatively, the following yaml file for a varying parameter per sampled trajectory:
 ```yaml
 dynamics:
-  name: VanDerPolParamaterised
+  name: VanDerPolParameterised
   args:
     parameter_generator: 
       name: Uniform
@@ -121,3 +121,4 @@ standard normal initial state and RK45 integrator are used by default.
 
 Development targets Python 3.11, numpy 1.26 and scipy 1.15 so as to support
 platforms with older toolchains.
+
