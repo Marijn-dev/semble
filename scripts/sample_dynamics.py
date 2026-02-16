@@ -27,6 +27,14 @@ def main(args):
         state_axis = None
         n_plots = n_dims + 1
 
+    if args.continuous_state:
+        dynamics = cast(semble.dynamics.ContinuousStateDynamics, dynamics)
+        state_axis = dynamics.get_space_axis()
+        n_plots = 2
+    else:
+        state_axis = None
+        n_plots = n_dims + 1
+
     fig, ax = plt.subplots(n_plots, 1, sharex=True)
     fig.canvas.mpl_connect("close_event", on_close_window)
     plt.ion()
@@ -34,6 +42,12 @@ def main(args):
     while True:
         if sampler._dyn._is_parameterised:
             _, t, y, u, parameter = sampler.get_example(
+                args.time_horizon,
+                n_samples=int(10 * args.time_horizon),
+                time_sample_method="linspace",
+            )
+        elif sampler._dyn._has_location:
+            _, t, y, u, location_in, location_out = sampler.get_example(
                 args.time_horizon,
                 n_samples=int(10 * args.time_horizon),
                 time_sample_method="linspace",

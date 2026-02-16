@@ -23,6 +23,7 @@ class Dynamics:
         control_dim: int,
         mask: Mask | None = None,
         is_parameterised: bool = False,
+        has_location: bool = False,
     ):
         self.n = state_dim
         self.m = control_dim
@@ -33,6 +34,7 @@ class Dynamics:
         self._method = "RK45"
 
         self._is_parameterised = is_parameterised
+        self._has_location = has_location
 
     def __call__(self, x: NDArray, u: NDArray) -> ArrayLike:
         return self._dx(x, u)
@@ -88,6 +90,22 @@ class ContinuousStateDynamics(Dynamics):
     def get_space_axis(self) -> NDArray:
         raise NotImplementedError
 
+    """Add location component for use in RHYME-XT"""
+
+    def __init__(self, *args):
+        super().__init__(
+            *args,
+            has_location=True,
+        )
+
+    # location of the outputs
+    def get_output_location(self) -> NDArray:
+        return self.get_space_axis()
+
+    # location of the inputs
+    def get_input_location(self) -> NDArray:
+        return self.get_space_axis_input()
+
 
 class LinearSys(Dynamics):
     def __init__(self, a: ArrayLike, b: ArrayLike):
@@ -138,6 +156,46 @@ class VanDerPolParameterised(ParameterisedDynamics):
 
     def _dx(self, x, u):
         return self.dynamics._dx(x, u)  # reuse differential equation of VanDerPol here
+
+
+class Kuramoto(Dynamics):
+    def __init__(self, frequency: float):
+        """
+        See https://arxiv.org/pdf/1809.06331 equation 2 with a star topology
+        """
+        super().__init__(4, 1)
+
+        # [w_1, w_2, w_3, w_4]
+        self.frequency = [frequency, 100.0, 100.0, 100.0]
+        self.k = 5.0
+
+    def _dx(self, x, u):
+        theta_1, theta_2, theta_3, theta_4 = x
+
+        # theta 1 is central node and has control term
+        dtheta_1 = (
+            self.frequency[0]
+            - self.k
+            * self.frequency[0]
+            * (
+                np.sin(theta_1 - theta_2)
+                + np.sin(theta_1 - theta_3)
+                + np.sin(theta_1 - theta_4)
+            )
+            + u[0]
+        )
+
+        dtheta_2 = self.frequency[1] + self.k * self.frequency[1] * (
+            np.sin(theta_1 - theta_2)
+        )
+        dtheta_3 = self.frequency[2] + self.k * self.frequency[2] * (
+            np.sin(theta_1 - theta_3)
+        )
+        dtheta_4 = self.frequency[3] + self.k * self.frequency[3] * (
+            np.sin(theta_1 - theta_4)
+        )
+
+        return (dtheta_1, dtheta_2, dtheta_3, dtheta_4)
 
 
 class FitzHughNagumo(Dynamics):
@@ -477,7 +535,6 @@ class HodgkinHuxleyFBE(Dynamics):
 class GreenshieldsTraffic(ContinuousStateDynamics):
     def __init__(self, n: int, v0: float, dx=None):
         super().__init__(n, 1)
-
         self.inv_step = self.n if not dx else 1.0 / dx
         self.v0 = v0
 
@@ -492,11 +549,14 @@ class GreenshieldsTraffic(ContinuousStateDynamics):
         q_in[0] = q0_in
 
         dx = self.inv_step * (q_in - q_out)
-
         return dx
 
     def get_space_axis(self):
         return np.linspace(0.0, 1.0 / self.inv_step * self.n, self.n)
+
+    def get_space_axis_input(self):
+        # location of the input is at the boundary
+        return np.array([0.0])
 
 
 class TwoTank(Dynamics):
@@ -540,6 +600,7 @@ _dynamics_names = {
     "LinearSys": LinearSys,
     "VanDerPol": VanDerPol,
     "VanDerPolParameterised": VanDerPolParameterised,
+    "Kuramoto": Kuramoto,
     "FitzHughNagumo": FitzHughNagumo,
     "FitzHughNagumoParameterised": FitzHughNagumoParameterised,
     "Pendulum": Pendulum,
