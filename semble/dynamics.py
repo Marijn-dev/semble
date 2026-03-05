@@ -210,7 +210,7 @@ class FitzHughNagumoV2(Dynamics):
         u, v = x
 
         du = self.theta_2 * (u - (u**3 / 3) + v + z[0])
-        dv = -1 * ((u - self.theta_0 - self.theta_1 * v) / self.theta_2)
+        dv = -1 * ((u - self.theta_0 + self.theta_1 * v) / self.theta_2)
 
         return (du, dv)
 
