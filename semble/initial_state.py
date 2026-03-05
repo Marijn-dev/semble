@@ -115,8 +115,23 @@ class GreenshieldsInitialState(InitialStateGenerator):
         x0 = np.empty((self.n_cells,))
         x0[0 : self.sec_size * self.n_sec] = np.repeat(x0_vals, self.sec_size)
         x0[self.sec_size * self.n_sec : -1] = x0[self.sec_size * self.n_sec - 1]
-
         return x0
+
+
+class KuramotoInitialState(InitialStateGenerator):
+    def __init__(self, n):
+        super().__init__()
+
+    def _sample_impl(self, rng):
+        return (np.pi / 4, np.pi / 10, np.pi / 2, np.pi / 5)
+
+
+class FitzHughNagumoV2InitialState(InitialStateGenerator):
+    def __init__(self, n):
+        super().__init__()
+
+    def _sample_impl(self, rng):
+        return (0, 0)
 
 
 _initstategen_names = {
@@ -128,6 +143,8 @@ _initstategen_names = {
     "HHFFEInitialState": HHFFEInitialState,
     "HHFBEInitialState": HHFBEInitialState,
     "GreenshieldsInitialState": GreenshieldsInitialState,
+    "KuramotoInitialState": KuramotoInitialState,
+    "FitzHughNagumoV2InitialState": FitzHughNagumoV2InitialState,
 }
 
 
