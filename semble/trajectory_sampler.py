@@ -138,6 +138,17 @@ class ParameterisedTrajectorySampler(TrajectorySampler):
         ), parameter
 
 
+class SpatialTrajectorySampler(TrajectorySampler):
+    def get_example(
+        self, *args, **kwargs
+    ) -> tuple[NDArray, NDArray, NDArray, NDArray, NDArray, NDArray]:
+        return (
+            *super().get_example(*args, **kwargs),
+            self._dyn.get_input_location(),
+            self._dyn.get_output_location(),
+        )
+
+
 def lhs(n_samples: int, rng: np.random.Generator) -> NDArray:
     """Performs Latin Hypercube sampling on the unit interval."""
     bins_start_val = np.linspace(0.0, 1.0, n_samples + 1)[:-1]
@@ -192,6 +203,7 @@ def make_trajectory_sampler(args: TSamplerSpec) -> TrajectorySampler:
             method=args.get("method"),
             initial_state_generator=init_state_gen,
         )
+
     else:
         sampler = TrajectorySampler(
             dynamics=dynamics,
