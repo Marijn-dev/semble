@@ -47,19 +47,42 @@ class Uniform(ParameterGenerator):
         parameter = rng.uniform(low=self._low, high=self._high, size=self.dim)
         return parameter
 
+
+class Gaussian(ParameterGenerator):
+    def __init__(self, mean, std, lower_bound=None, upper_bound=None, dim=1):
+        super().__init__(dim)
+
+        self._mean = mean
+        self._std = std
+
+        self._upper_bound = upper_bound
+        self._lower_bound = lower_bound
+
+    def _sample_impl(self, rng):
+        while True:
+            parameter = rng.normal(loc=self._mean, scale=self._std, size=self.dim)
+            if self._lower_bound is None and self._upper_bound is None:
+                return parameter
+
+            if parameter >= self._lower_bound and parameter <= self._upper_bound:
+                return parameter
+
+
 class Delta(ParameterGenerator):
     def __init__(self, value, dim=1):
         super().__init__(dim)
 
         self._value = value
-    
+
     def _sample_impl(self, rng):
         parameter = np.full(shape=(self.dim,), fill_value=self._value, dtype=float)
         return parameter
-    
+
+
 # Distributions
 _pargen_names = {
     "Uniform": Uniform,
+    "Gaussian": Gaussian,
     "Delta": Delta,
 }
 
