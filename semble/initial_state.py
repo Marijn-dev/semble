@@ -131,7 +131,7 @@ class FitzHughNagumoV2InitialState(InitialStateGenerator):
         super().__init__()
 
     def _sample_impl(self, rng):
-        return (0, 0)
+        return np.array([0, 0])
 
 
 _initstategen_names = {
