@@ -1,0 +1,26 @@
+dynamics:
+  name: ParameterisedGreenshieldsTraffic
+  args:
+    n: &n 200
+    dx: 0.01
+    parameter_generator:
+      name: Uniform
+      args:
+        low: 0.95
+        high: 1.05
+        dim: 8 # logic equivalent to n_sections
+
+sequence_generator:
+  name: UniformSqWave
+  args:
+    period: 1
+    min: 0.
+    max: 0.5
+
+initial_state_generator:
+  name: GreenshieldsInitialState
+  args:
+    n_cells: *n
+    n_sections: 8
+
+control_delta: 1.0

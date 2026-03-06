@@ -540,23 +540,56 @@ class GreenshieldsTraffic(ContinuousStateDynamics):
 
         self.inv_step = self.n if not dx else 1.0 / dx
         self.v0 = v0
+        self.flux_u = self.flux
 
     def flux(self, x: NDArray | float):
         return self.v0 * x * (1.0 - x)
 
     def _dx(self, x, u):
         q_out = self.flux(x)
-        q0_in = self.flux(u.item())
+
+        # q0_in = self.flux(u.item())
+        q0_in = self.flux_u(u.item())
 
         q_in = np.roll(q_out, 1)
         q_in[0] = q0_in
 
         dx = self.inv_step * (q_in - q_out)
-
         return dx
 
     def get_space_axis(self):
         return np.linspace(0.0, 1.0 / self.inv_step * self.n, self.n)
+
+
+class ParameterisedGreenshieldsTraffic(ParameterisedDynamics):
+    def __init__(self, n: int, dx=None, parameter_generator: dict = None):
+        super().__init__(parameter_generator, n, 1)
+
+        self.dynamics = GreenshieldsTraffic(n, None, dx)
+        self.dynamics.flux_u = self.flux_u
+        self.dynamics._method = "BDF"
+
+    def _set_parameter(self, rng, parameter):
+        if parameter is None:
+            self._parameter = self._parameter_generator.sample(rng)
+        else:
+            self._parameter = parameter
+
+        n_sec = len(self._parameter)
+        sec_size = self.n // n_sec
+        v0 = np.empty((self.n,))
+        v0[0 : sec_size * n_sec] = np.repeat(self._parameter, sec_size)
+        v0[sec_size * n_sec :] = v0[sec_size * n_sec - 1]
+        self.dynamics.v0 = v0
+
+    def _get_parameter(self):
+        return self._parameter
+
+    def flux_u(self, x: float):
+        return self.dynamics.v0[0] * x * (1.0 - x)
+
+    def _dx(self, x, u):
+        return self.dynamics._dx(x, u)
 
 
 class TwoTank(Dynamics):
@@ -611,6 +644,7 @@ _dynamics_names = {
     "HodgkinHuxleyFFE": HodgkinHuxleyFFE,
     "HodgkinHuxleyFBE": HodgkinHuxleyFBE,
     "GreenshieldsTraffic": GreenshieldsTraffic,
+    "ParameterisedGreenshieldsTraffic": ParameterisedGreenshieldsTraffic,
     "TwoTank": TwoTank,
 }
 
