@@ -592,11 +592,13 @@ class GreenshieldsTraffic(ContinuousStateDynamics):
 
 class NewellDaganzoTraffic(ContinuousStateDynamics):
     def __init__(self, n: int, V: float, dx=None):
+        """Implementation of basic Cell Transmission Model (CTM) using Newell-Daganzo traffic model.
+        https://people.kth.se/~kallej/grad_students/cicic_phdthesis21.pdf"""
         super().__init__(n, 1)
 
         self.inv_step = self.n if not dx else 1.0 / dx
         self.V = V
-        self.sigma = 0.25  # pivot location
+        self.sigma = 0.6
         self.P = 1.0
         self.W = self.V * (self.sigma / (self.P - self.sigma))
         self.q_max = self.V * self.sigma
@@ -604,28 +606,26 @@ class NewellDaganzoTraffic(ContinuousStateDynamics):
         self._parameters = np.array([self.V, self.W, self.P, self.sigma])
 
     def flux_i(self, x: NDArray):
-        D = self.demand(x)
         x_plus_one = np.roll(x, -1)
         x_plus_one[-1] = self.boundary_right  # rho_{N+1}
-        D = self.demand(x)  # D_{i}
-        S = self.supply(x_plus_one)  # S_{i+1}
-        q = np.minimum(D, S)
+        D = self.demand(x)
+        S = self.supply(x_plus_one)
+        q = np.minimum(D, S)  # (3.17)
         return q
 
     def flux_i_minus_one(self, x: NDArray, u: float):
-        D = self.demand(x)
         x_minus_one = np.roll(x, 1)
         x_minus_one[0] = u  # rho_{0}
-        D = self.demand(x_minus_one)  # D_{i-1}
-        S = self.supply(x)  # S_{i}
-        q = np.minimum(D, S)
+        D = self.demand(x_minus_one)
+        S = self.supply(x)
+        q = np.minimum(D, S)  # (3.17)
         return q
 
-    def demand(self, x: NDArray):
+    def demand(self, x: NDArray):  # (3.18)
         D = np.minimum(self.V * x, self.q_max)
         return D
 
-    def supply(self, x: NDArray):
+    def supply(self, x: NDArray):  # (3.19)
         S = np.minimum(self.W * (self.P - x), self.q_max)
         return S
 
@@ -633,7 +633,7 @@ class NewellDaganzoTraffic(ContinuousStateDynamics):
         q_i = self.flux_i(x)  # q_{i}
         q_i_minus_one = self.flux_i_minus_one(x, u.item())  # q_{i-1}
 
-        dx = self.inv_step * (q_i_minus_one - q_i)  # q_{i-1} - q_{1}
+        dx = self.inv_step * (q_i_minus_one - q_i)  # (3.16)
         return dx
 
     def get_space_axis(self):
