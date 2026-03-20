@@ -1,7 +1,5 @@
 import numpy as np
 from . import initial_state, parameter_generators
-
-
 from numpy.typing import ArrayLike, NDArray
 from typing import Any
 
@@ -540,7 +538,6 @@ class GreenshieldsTraffic(ContinuousStateDynamics):
 
         self.inv_step = self.n if not dx else 1.0 / dx
         self.v0 = v0
-        self.flux_u = self.flux
 
     def flux(self, x: NDArray | float):
         return self.v0 * x * (1.0 - x)
@@ -548,8 +545,7 @@ class GreenshieldsTraffic(ContinuousStateDynamics):
     def _dx(self, x, u):
         q_out = self.flux(x)
 
-        # q0_in = self.flux(u.item())
-        q0_in = self.flux_u(u.item())
+        q0_in = self.flux(u.item())
 
         q_in = np.roll(q_out, 1)
         q_in[0] = q0_in
@@ -561,12 +557,94 @@ class GreenshieldsTraffic(ContinuousStateDynamics):
         return np.linspace(0.0, 1.0 / self.inv_step * self.n, self.n)
 
 
-class ParameterisedGreenshieldsTraffic(ParameterisedDynamics):
+### Implementation same as in initial condition
+# class ParameterisedGreenshieldsTraffic(ParameterisedDynamics):
+#     def __init__(self, n: int, dx=None, parameter_generator: dict = None):
+#         super().__init__(parameter_generator, n, 1)
+
+#         self.dynamics = GreenshieldsTraffic(n, None, dx)
+#         self.dynamics.flux_u = self.flux_u
+#         self.dynamics._method = "BDF"
+#         print(self.dynamics.get_space_axis())
+#         return 0
+#     def _set_parameter(self, rng, parameter):
+#         if parameter is None:
+#             self._parameter = self._parameter_generator.sample(rng)
+#         else:
+#             self._parameter = parameter
+
+#         n_sec = len(self._parameter)
+#         sec_size = self.n // n_sec
+#         v0 = np.empty((self.n,))
+#         v0[0 : sec_size * n_sec] = np.repeat(self._parameter, sec_size)
+#         v0[sec_size * n_sec :] = v0[sec_size * n_sec - 1]
+#         self.dynamics.v0 = v0
+
+#     def _get_parameter(self):
+#         return self._parameter
+
+#     def flux_u(self, x: float):
+#         return self.dynamics.v0[0] * x * (1.0 - x)
+
+#     def _dx(self, x, u):
+#         return self.dynamics._dx(x, u)
+
+
+class NewellDaganzoTraffic(ContinuousStateDynamics):
+    def __init__(self, n: int, V: float, dx=None):
+        super().__init__(n, 1)
+
+        self.inv_step = self.n if not dx else 1.0 / dx
+        self.V = V
+        self.sigma = 0.25  # pivot location
+        self.P = 1.0
+        self.W = self.V * (self.sigma / (self.P - self.sigma))
+        self.q_max = self.V * self.sigma
+        self.boundary_right = 0
+        self._parameters = np.array([self.V, self.W, self.P, self.sigma])
+
+    def flux_i(self, x: NDArray):
+        D = self.demand(x)
+        x_plus_one = np.roll(x, -1)
+        x_plus_one[-1] = self.boundary_right  # rho_{N+1}
+        D = self.demand(x)  # D_{i}
+        S = self.supply(x_plus_one)  # S_{i+1}
+        q = np.minimum(D, S)
+        return q
+
+    def flux_i_minus_one(self, x: NDArray, u: float):
+        D = self.demand(x)
+        x_minus_one = np.roll(x, 1)
+        x_minus_one[0] = u  # rho_{0}
+        D = self.demand(x_minus_one)  # D_{i-1}
+        S = self.supply(x)  # S_{i}
+        q = np.minimum(D, S)
+        return q
+
+    def demand(self, x: NDArray):
+        D = np.minimum(self.V * x, self.q_max)
+        return D
+
+    def supply(self, x: NDArray):
+        S = np.minimum(self.W * (self.P - x), self.q_max)
+        return S
+
+    def _dx(self, x, u):
+        q_i = self.flux_i(x)  # q_{i}
+        q_i_minus_one = self.flux_i_minus_one(x, u.item())  # q_{i-1}
+
+        dx = self.inv_step * (q_i_minus_one - q_i)  # q_{i-1} - q_{1}
+        return dx
+
+    def get_space_axis(self):
+        return np.linspace(0.0, 1.0 / self.inv_step * self.n, self.n)
+
+
+class ParameterisedNewellDaganzoTraffic(ParameterisedDynamics):
     def __init__(self, n: int, dx=None, parameter_generator: dict = None):
         super().__init__(parameter_generator, n, 1)
 
-        self.dynamics = GreenshieldsTraffic(n, None, dx)
-        self.dynamics.flux_u = self.flux_u
+        self.dynamics = NewellDaganzoTraffic(n, 0, dx)
         self.dynamics._method = "BDF"
 
     def _set_parameter(self, rng, parameter):
@@ -575,18 +653,17 @@ class ParameterisedGreenshieldsTraffic(ParameterisedDynamics):
         else:
             self._parameter = parameter
 
-        n_sec = len(self._parameter)
-        sec_size = self.n // n_sec
-        v0 = np.empty((self.n,))
-        v0[0 : sec_size * n_sec] = np.repeat(self._parameter, sec_size)
-        v0[sec_size * n_sec :] = v0[sec_size * n_sec - 1]
-        self.dynamics.v0 = v0
+        self.dynamics.V = self._parameter[0]
+        self.dynamics.W = self.dynamics.V * (
+            self.dynamics.sigma / (self.dynamics.P - self.dynamics.sigma)
+        )
+        self.dynamics.q_max = self.dynamics.V * self.dynamics.sigma
+        self.dynamics._parameters = np.array(
+            [self.dynamics.V, self.dynamics.W, self.dynamics.P, self.dynamics.sigma]
+        )
 
     def _get_parameter(self):
         return self._parameter
-
-    def flux_u(self, x: float):
-        return self.dynamics.v0[0] * x * (1.0 - x)
 
     def _dx(self, x, u):
         return self.dynamics._dx(x, u)
@@ -644,7 +721,8 @@ _dynamics_names = {
     "HodgkinHuxleyFFE": HodgkinHuxleyFFE,
     "HodgkinHuxleyFBE": HodgkinHuxleyFBE,
     "GreenshieldsTraffic": GreenshieldsTraffic,
-    "ParameterisedGreenshieldsTraffic": ParameterisedGreenshieldsTraffic,
+    "NewellDaganzoTraffic": NewellDaganzoTraffic,
+    "ParameterisedNewellDaganzoTraffic": ParameterisedNewellDaganzoTraffic,
     "TwoTank": TwoTank,
 }
 
