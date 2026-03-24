@@ -96,8 +96,10 @@ class TrajectorySampler:
             x0,
             t_eval=t_samples,
             method=self._ode_method,
+            max_step=0.005,
+            atol=1e-9,
+            rtol=1e-9,
         )
-
         x_traj = traj.y.T
         t = traj.t.reshape(-1, 1)
         return x0, t, x_traj, u
