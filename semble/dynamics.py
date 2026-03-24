@@ -24,7 +24,6 @@ class Dynamics:
     ):
         self.n = state_dim
         self.m = control_dim
-
         self.mask = mask if mask is not None else self.n * (1,)
         self.p = sum(self.mask)
 
@@ -592,13 +591,13 @@ class GreenshieldsTraffic(ContinuousStateDynamics):
 
 class NewellDaganzoTraffic(ContinuousStateDynamics):
     def __init__(self, n: int, V: float, dx=None):
-        """Implementation of basic Cell Transmission Model (CTM) using Newell-Daganzo traffic model.
+        """Implementation of basic Cell Transmission Model (CTM) with Newell-Daganzo flux function.
         https://people.kth.se/~kallej/grad_students/cicic_phdthesis21.pdf"""
         super().__init__(n, 1)
 
         self.inv_step = self.n if not dx else 1.0 / dx
         self.V = V
-        self.sigma = 0.6
+        self.sigma = 0.25
         self.P = 1.0
         self.W = self.V * (self.sigma / (self.P - self.sigma))
         self.q_max = self.V * self.sigma
@@ -669,6 +668,94 @@ class ParameterisedNewellDaganzoTraffic(ParameterisedDynamics):
         return self.dynamics._dx(x, u)
 
 
+class CellTransmissionModel(ContinuousStateDynamics):
+    def __init__(
+        self, n: int, locations: NDArray = None, values: NDArray = None, dx=None
+    ):
+        """Implementation of basic Cell Transmission Model (CTM) with general flux functions.
+        https://people.kth.se/~kallej/grad_students/cicic_phdthesis21.pdf"""
+        super().__init__(n, 1)
+        self._method = "BDF"
+        self.inv_step = self.n if not dx else 1.0 / dx
+        self.P = 1
+        if locations:
+            self.locs = np.zeros(len(locations) + 2)
+            self.vals = np.zeros(len(values) + 2)
+            self.vals[1:-1] = np.array(values)
+            self.locs[1:-1] = np.array(locations)
+            self.locs[-1] = self.P
+            idx = np.argsort(self.locs)  # expect increasing locations
+            self.locs = self.locs[idx]
+            self.vals = self.vals[idx]
+            self.sigma_i = self.locs[np.argmax(self.vals)]
+
+    def flux(self, x: NDArray):
+        return np.interp(x, self.locs, self.vals)
+
+    def _dx(self, x, u):
+        x_minus_one = np.roll(x, 1)
+        x_minus_one[0] = u  # rho_{0}
+        x_plus_one = np.roll(x, -1)
+        x_plus_one[-1] = 0  # rho_{N+1}
+
+        D_i_minus_one = self.flux(np.minimum(x_minus_one, self.sigma_i))
+        S_i = self.flux(np.maximum(x, self.sigma_i))
+        q_i_minus_one = np.minimum(D_i_minus_one, S_i)
+
+        D_i = self.flux(np.minimum(x, self.sigma_i))
+        S_i_plus_one = self.flux(np.maximum(x_plus_one, self.sigma_i))
+        q_i = np.minimum(D_i, S_i_plus_one)
+
+        dx = self.inv_step * (q_i_minus_one - q_i)
+        return dx
+
+    def get_space_axis(self):
+        return np.linspace(0.0, 1.0 / self.inv_step * self.n, self.n)
+
+
+class ParameterisedCellTransmissionModel(ParameterisedDynamics):
+    def __init__(self, n: int, dx=None, parameter_generator: dict = None):
+        """Implementation of basic Cell Transmission Model (CTM) with general flux functions.
+        https://people.kth.se/~kallej/grad_students/cicic_phdthesis21.pdf
+
+        Parameters are return according to theta=(sigma_1,q_1,...sigma_k, q_k), where sigma are locations and q corresponding values. theta is sorted such that sigma_1 < sigma_2 < sigma_k"""
+        super().__init__(parameter_generator, n, 1)
+        self._method = "BDF"
+        self.dynamics = CellTransmissionModel(n, None, None, dx)
+
+    def _set_parameter(self, rng, parameter):
+        if parameter is None:
+            self._parameter = self._parameter_generator.sample(rng)
+        else:
+            self._parameter = parameter
+
+        locations = self._parameter[::2]
+        values = self._parameter[1::2]
+        idx = np.argsort(locations)
+        locations = locations[idx]
+        values = values[idx]
+        self._parameter = np.empty(2 * len(locations))
+        self._parameter[::2] = locations
+        self._parameter[1::2] = values
+
+        self.dynamics.locs = np.zeros(len(locations) + 2)
+        self.dynamics.vals = np.zeros(len(values) + 2)
+        self.dynamics.vals[1:-1] = values
+        self.dynamics.locs[1:-1] = locations
+        self.dynamics.locs[-1] = self.dynamics.P
+
+        self.dynamics.sigma_i = self.dynamics.locs[np.argmax(self.dynamics.vals)]
+
+    def _get_parameter(self):
+        return self._parameter
+
+    def _dx(self, x, u):
+        return self.dynamics._dx(x, u)
+
+    def get_space_axis(self):
+        return self.dynamics.get_space_axis()
+
+
 class TwoTank(Dynamics):
     """Two tank dynamics with overflow.
     Source: https://apmonitor.com/do/index.php/Main/LevelControl
@@ -723,6 +810,8 @@ _dynamics_names = {
     "GreenshieldsTraffic": GreenshieldsTraffic,
     "NewellDaganzoTraffic": NewellDaganzoTraffic,
     "ParameterisedNewellDaganzoTraffic": ParameterisedNewellDaganzoTraffic,
+    "CellTransmissionModel": CellTransmissionModel,
+    "ParameterisedCellTransmissionModel": ParameterisedCellTransmissionModel,
     "TwoTank": TwoTank,
 }
 
