@@ -3,8 +3,7 @@ from . import initial_state, parameter_generators
 from numpy.typing import ArrayLike, NDArray
 from typing import Any
 
-Dims = tuple[int, int, int]
-DimsParam = tuple[*Dims, int]
+Dims = tuple[int, int, int, int]
 Mask = tuple[int, ...]
 
 
@@ -51,7 +50,7 @@ class Dynamics:
         return self._method
 
     def dims(self) -> Dims:
-        return (self.n, self.m, self.p)
+        return (self.n, self.m, self.p, 0)
 
 
 class ParameterisedDynamics(Dynamics):
@@ -77,8 +76,8 @@ class ParameterisedDynamics(Dynamics):
         self._set_parameter(rng, parameter)
         return self._get_parameter()
 
-    def dims(self) -> DimsParam:
-        return (*super().dims(), self._parameter_generator.dim)
+    def dims(self) -> Dims:
+        return (self.n, self.m, self.p, self._parameter_generator.dim)
 
 
 class ContinuousStateDynamics(Dynamics):
@@ -675,7 +674,6 @@ class CellTransmissionModel(ContinuousStateDynamics):
         """Implementation of basic Cell Transmission Model (CTM) with general flux functions.
         https://people.kth.se/~kallej/grad_students/cicic_phdthesis21.pdf"""
         super().__init__(n, 1)
-        self._method = "BDF"
         self.inv_step = self.n if not dx else 1.0 / dx
         self.P = 1
         if locations:
@@ -694,7 +692,7 @@ class CellTransmissionModel(ContinuousStateDynamics):
 
     def _dx(self, x, u):
         x_minus_one = np.roll(x, 1)
-        x_minus_one[0] = u  # rho_{0}
+        x_minus_one[0] = u[0]  # rho_{0}
         x_plus_one = np.roll(x, -1)
         x_plus_one[-1] = 0  # rho_{N+1}
 
@@ -720,7 +718,6 @@ class ParameterisedCellTransmissionModel(ParameterisedDynamics):
 
         Parameters are return according to theta=(sigma_1,q_1,...sigma_k, q_k), where sigma are locations and q corresponding values. theta is sorted such that sigma_1 < sigma_2 < sigma_k"""
         super().__init__(parameter_generator, n, 1)
-        self._method = "BDF"
         self.dynamics = CellTransmissionModel(n, None, None, dx)
 
     def _set_parameter(self, rng, parameter):

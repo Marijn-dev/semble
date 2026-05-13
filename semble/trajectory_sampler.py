@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 
 from typing import Literal, TypedDict, NotRequired
 
-from .dynamics import Dynamics, Dims, DimsParam, get_dynamics
+from .dynamics import Dynamics, Dims, get_dynamics
 from .sequence_generators import SequenceGenerator, get_sequence_generator, Args
 from .initial_state import InitialStateGenerator, get_initial_state_generator
 
@@ -35,7 +35,7 @@ class TrajectorySampler:
 
         self._init_time = 0.0
 
-    def dims(self) -> Dims | DimsParam:
+    def dims(self) -> Dims:
         return self._dyn.dims()
 
     def reset_rngs(self, seed: int | None = None):
@@ -96,10 +96,8 @@ class TrajectorySampler:
             x0,
             t_eval=t_samples,
             method=self._ode_method,
-            max_step=0.005,
-            atol=1e-9,
-            rtol=1e-9,
         )
+
         x_traj = traj.y.T
         t = traj.t.reshape(-1, 1)
         return x0, t, x_traj, u
@@ -133,22 +131,11 @@ class ParameterisedTrajectorySampler(TrajectorySampler):
     ) -> tuple[NDArray, NDArray, NDArray, NDArray, NDArray]:
         parameter = self._dyn.gen_parameter(
             self._param_rng, parameter
-        )  # Set and return parameter
+        )  # Sets and returns parameter
 
         return *super().get_example(
             time_horizon, n_samples, time_sample_method
         ), parameter
-
-
-class SpatialTrajectorySampler(TrajectorySampler):
-    def get_example(
-        self, *args, **kwargs
-    ) -> tuple[NDArray, NDArray, NDArray, NDArray, NDArray, NDArray]:
-        return (
-            *super().get_example(*args, **kwargs),
-            self._dyn.get_input_location(),
-            self._dyn.get_output_location(),
-        )
 
 
 def lhs(n_samples: int, rng: np.random.Generator) -> NDArray:
