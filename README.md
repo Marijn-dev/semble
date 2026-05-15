@@ -6,7 +6,7 @@ This is a utility package to easily generate synthetic datasets of
 
 The architecture is based on composing a control system of the forms
 $\dot{x} = f(x, u)$ and $\dot{x} = f(x,u;\theta)$ with probability distributions for the initial condition
-$x_0 = x(0)$, control input $u$, and $\theta$.
+$x_0 = x(0)$, control input $u$, and parameter $\theta$.
 Together, these specify a distribution on system trajectories which can be
 sampled from.
 `semble` allows one to specify such a distribution in a simple human-readable
