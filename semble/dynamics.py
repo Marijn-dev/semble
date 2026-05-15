@@ -109,9 +109,7 @@ class VanDerPol(Dynamics):
         p, v = x
 
         dp = v
-        dv = (
-            -p + self.damping * (1 - p**2) * v + u[0]
-        )  # u[0] instead of u.item() to facilitate jit compilation
+        dv = -p + self.damping * (1 - p**2) * v + u[0]
 
         return (dp, dv)
 
@@ -148,24 +146,21 @@ class FitzHughNagumo(Dynamics):
     def _dx(self, x, u):
         v, w = x
 
-        dv = 50 * (v - v**3 - w + u[0])  # u[0] instead of u.item() for jit compilation
+        dv = 50 * (v - v**3 - w + u[0])
         dw = (v - self.a - self.b * w) / self.tau
 
         return (dv, dw)
 
 
-class FitzHughNagumoParameterised(ParameterisedDynamics):
+class ParameterisedFitzHughNagumo(ParameterisedDynamics):
     def __init__(
         self,
-        tau: float = None,
-        a: float = None,
-        b: float = None,
         parameter_generator: dict = None,
     ):
         super().__init__(parameter_generator, 2, 1)
         self._method = "BDF"
 
-        self.dynamics = FitzHughNagumo(tau, a, b)
+        self.dynamics = FitzHughNagumo(None, None, None)
         self._method = self.dynamics._method
 
     def _set_parameter(self, rng, parameter):
@@ -175,72 +170,8 @@ class FitzHughNagumoParameterised(ParameterisedDynamics):
             self._parameter = parameter
 
         self.dynamics.tau = self._parameter[0]
-        self.dynamics.a = (
-            self._parameter[1] if len(self._parameter) > 1 else self.dynamics.a
-        )
-        self.dynamics.b = (
-            self._parameter[2] if len(self._parameter) > 2 else self.dynamics.b
-        )
-
-    def _get_parameter(self):
-        return self._parameter
-
-    def _dx(self, x, u):
-        return self.dynamics._dx(x, u)
-
-
-class FitzHughNagumoV2(Dynamics):
-    def __init__(self, theta_0: float, theta_1: float, theta_2: float):
-        """
-        Implementation according to NEURAL NETWORKS FOR BAYESIAN INVERSE PROBLEMS GOVERNED BY A NONLINEAR ODE (https://arxiv.org/pdf/2510.14197)
-        """
-        super().__init__(2, 1)
-        self._method = "BDF"
-
-        self.theta_0 = theta_0
-        self.theta_1 = theta_1
-        self.theta_2 = theta_2
-
-    def _dx(self, x, z):
-        # z is our input here
-        u, v = x
-
-        du = self.theta_2 * (u - (u**3 / 3) + v + z[0])
-        dv = -1 * ((u - self.theta_0 + self.theta_1 * v) / self.theta_2)
-
-        return (du, dv)
-
-
-class FitzHughNagumoV2Parameterised(ParameterisedDynamics):
-    def __init__(
-        self,
-        theta_0: float = None,
-        theta_1: float = None,
-        theta_2: float = None,
-        parameter_generator: dict = None,
-    ):
-        super().__init__(parameter_generator, 2, 1)
-        self._method = "BDF"
-
-        self.dynamics = FitzHughNagumoV2(theta_0, theta_1, theta_2)
-        self._method = self.dynamics._method
-
-    def default_initial_state(self):
-        return initial_state.FitzHughNagumoV2InitialState(self.n)
-
-    def _set_parameter(self, rng, parameter):
-        if parameter is None:
-            self._parameter = self._parameter_generator.sample(rng)
-        else:
-            self._parameter = parameter
-
-        self.dynamics.theta_0 = self._parameter[0]
-        self.dynamics.theta_1 = (
-            self._parameter[1] if len(self._parameter) > 1 else self.dynamics.theta_1
-        )
-        self.dynamics.theta_2 = (
-            self._parameter[2] if len(self._parameter) > 2 else self.dynamics.theta_2
-        )
+        self.dynamics.a = self._parameter[1]
+        self.dynamics.b = self._parameter[2]
 
     def _get_parameter(self):
         return self._parameter
@@ -555,39 +486,6 @@ class GreenshieldsTraffic(ContinuousStateDynamics):
         return np.linspace(0.0, 1.0 / self.inv_step * self.n, self.n)
 
 
-### Implementation same as in initial condition
-# class ParameterisedGreenshieldsTraffic(ParameterisedDynamics):
-#     def __init__(self, n: int, dx=None, parameter_generator: dict = None):
-#         super().__init__(parameter_generator, n, 1)
-
-#         self.dynamics = GreenshieldsTraffic(n, None, dx)
-#         self.dynamics.flux_u = self.flux_u
-#         self.dynamics._method = "BDF"
-#         print(self.dynamics.get_space_axis())
-#         return 0
-#     def _set_parameter(self, rng, parameter):
-#         if parameter is None:
-#             self._parameter = self._parameter_generator.sample(rng)
-#         else:
-#             self._parameter = parameter
-
-#         n_sec = len(self._parameter)
-#         sec_size = self.n // n_sec
-#         v0 = np.empty((self.n,))
-#         v0[0 : sec_size * n_sec] = np.repeat(self._parameter, sec_size)
-#         v0[sec_size * n_sec :] = v0[sec_size * n_sec - 1]
-#         self.dynamics.v0 = v0
-
-#     def _get_parameter(self):
-#         return self._parameter
-
-#     def flux_u(self, x: float):
-#         return self.dynamics.v0[0] * x * (1.0 - x)
-
-#     def _dx(self, x, u):
-#         return self.dynamics._dx(x, u)
-
-
 class NewellDaganzoTraffic(ContinuousStateDynamics):
     def __init__(self, n: int, V: float, dx=None):
         """Implementation of basic Cell Transmission Model (CTM) with Newell-Daganzo flux function.
@@ -666,6 +564,9 @@ class ParameterisedNewellDaganzoTraffic(ParameterisedDynamics):
     def _dx(self, x, u):
         return self.dynamics._dx(x, u)
 
+    def get_space_axis(self):
+        return self.dynamics.get_space_axis()
+
 
 class CellTransmissionModel(ContinuousStateDynamics):
     def __init__(
@@ -682,7 +583,7 @@ class CellTransmissionModel(ContinuousStateDynamics):
             self.vals[1:-1] = np.array(values)
             self.locs[1:-1] = np.array(locations)
             self.locs[-1] = self.P
-            idx = np.argsort(self.locs)  # expect increasing locations
+            idx = np.argsort(self.locs)
             self.locs = self.locs[idx]
             self.vals = self.vals[idx]
             self.sigma_i = self.locs[np.argmax(self.vals)]
@@ -793,11 +694,7 @@ class TwoTank(Dynamics):
 _dynamics_names = {
     "LinearSys": LinearSys,
     "VanDerPol": VanDerPol,
-    "VanDerPolParameterised": VanDerPolParameterised,
     "FitzHughNagumo": FitzHughNagumo,
-    "FitzHughNagumoV2": FitzHughNagumoV2,
-    "FitzHughNagumoParameterised": FitzHughNagumoParameterised,
-    "FitzHughNagumoV2Parameterised": FitzHughNagumoV2Parameterised,
     "Pendulum": Pendulum,
     "HodgkinHuxleyFS": HodgkinHuxleyFS,
     "HodgkinHuxleyRSA": HodgkinHuxleyRSA,
@@ -806,10 +703,12 @@ _dynamics_names = {
     "HodgkinHuxleyFBE": HodgkinHuxleyFBE,
     "GreenshieldsTraffic": GreenshieldsTraffic,
     "NewellDaganzoTraffic": NewellDaganzoTraffic,
-    "ParameterisedNewellDaganzoTraffic": ParameterisedNewellDaganzoTraffic,
     "CellTransmissionModel": CellTransmissionModel,
-    "ParameterisedCellTransmissionModel": ParameterisedCellTransmissionModel,
     "TwoTank": TwoTank,
+    "VanDerPolParameterised": VanDerPolParameterised,
+    "ParameterisedFitzHughNagumo": ParameterisedFitzHughNagumo,
+    "ParameterisedCellTransmissionModel": ParameterisedCellTransmissionModel,
+    "ParameterisedNewellDaganzoTraffic": ParameterisedNewellDaganzoTraffic,
 }
 
 

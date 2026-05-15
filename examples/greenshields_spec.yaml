@@ -1,25 +1,20 @@
 dynamics:
-  name: ParameterisedNewellDaganzoTraffic
+  name: GreenshieldsTraffic
   args:
-    n: &n 200
     dx: 0.01
-    parameter_generator:
-      name: Delta
-      args:
-        # V
-        value: 1.0
-
+    n: 200
+    v0: 1.0
 sequence_generator:
   name: UniformSqWave
   args:
-    period: 2
+    period: 1
     min: 0.
     max: 0.5
 
 initial_state_generator:
   name: GreenshieldsInitialState
   args:
-    n_cells: *n
+    n_cells: 200
     n_sections: 8
 
-control_delta: 0.2
+control_delta: 1.0

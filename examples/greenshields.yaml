@@ -1,14 +1,12 @@
 dynamics:
-  name: CellTransmissionModel
+  name: GreenshieldsTraffic
   args:
-    n: &n 200
-    dx: 0.01
-    locations: [0.25, 0.60]
-    values: [0.20, 0.10]
+    n: &n 100
+    v0: 1.0
 sequence_generator:
   name: UniformSqWave
   args:
-    period: 2
+    period: 1
     min: 0.
     max: 0.5
 
@@ -16,6 +14,6 @@ initial_state_generator:
   name: GreenshieldsInitialState
   args:
     n_cells: *n
-    n_sections: 8
+    n_sections: 4
 
-control_delta: 0.2
+control_delta: 1.0

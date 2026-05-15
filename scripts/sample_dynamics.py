@@ -58,11 +58,14 @@ def main(args):
             u[:-1],
             where="post",
         )
-        if sampler._dyn._is_parameterised:
-            formatted_parameter = ", ".join([f"{x:.2f}" for x in parameter])
-            ax[0].set_title(r"$\theta = {}$".format(formatted_parameter))
         ax[-1].set_ylabel(r"$u$")
         ax[-1].set_xlabel(r"$t$")
+
+        if sampler._dyn._is_parameterised:
+            parameter = sampler._dyn._parameter
+            formatted_parameter = ", ".join([f"{x:.2f}" for x in parameter])
+            ax[0].set_title(r"$\theta = {}$".format(formatted_parameter))
+
         plt.draw()
 
         # Wait for key press
