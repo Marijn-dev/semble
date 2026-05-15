@@ -114,7 +114,7 @@ class VanDerPol(Dynamics):
         return (dp, dv)
 
 
-class VanDerPolParameterised(ParameterisedDynamics):
+class ParameterisedVanDerPol(ParameterisedDynamics):
     def __init__(self, parameter_generator: dict = None):
         super().__init__(parameter_generator, 2, 1)
 
@@ -705,7 +705,7 @@ _dynamics_names = {
     "NewellDaganzoTraffic": NewellDaganzoTraffic,
     "CellTransmissionModel": CellTransmissionModel,
     "TwoTank": TwoTank,
-    "VanDerPolParameterised": VanDerPolParameterised,
+    "ParameterisedVanDerPol": ParameterisedVanDerPol,
     "ParameterisedFitzHughNagumo": ParameterisedFitzHughNagumo,
     "ParameterisedCellTransmissionModel": ParameterisedCellTransmissionModel,
     "ParameterisedNewellDaganzoTraffic": ParameterisedNewellDaganzoTraffic,
