@@ -212,7 +212,7 @@ class ParameterisedFitzHughNagumoV2(ParameterisedDynamics):
             self._parameter = self._parameter_generator.sample(rng)
         else:
             self._parameter = parameter
-        print(self._parameter)
+
         self.dynamics.theta_0 = self._parameter[0]
         self.dynamics.theta_1 = self._parameter[1]
         self.dynamics.theta_2 = self._parameter[2]
