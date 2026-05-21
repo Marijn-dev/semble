@@ -1,0 +1,35 @@
+dynamics:
+  name: ParameterisedFitzHughNagumoV2
+  args:
+    parameter_generator:
+      name: Product
+      args:
+      # theta_0 
+        - name: Uniform
+          args:
+            low: -0.2
+            high: 1.0
+      # theta_1 
+        - name: Uniform
+          args:
+            low: -0.4
+            high: 1.2
+      # theta_2
+        - name: Uniform
+          args:
+            low: 2.0
+            high: 5.0
+sequence_generator:
+  name: GaussianSqWave
+  args:
+    mean: -0.4
+    std: 0.0
+    period: 2
+initial_state_generator:
+  name: UniformInitialState
+  args:
+    min: 0.0
+    max: 0.0
+    n: 2
+
+control_delta: 5

@@ -1,0 +1,20 @@
+dynamics:
+  name: FitzHughNagumoV2
+  args:
+    theta_0: 0.5
+    theta_1: 0.25
+    theta_2: 2.0
+sequence_generator:
+  name: GaussianSqWave
+  args:
+    mean: -0.4
+    std: 0.0
+    period: 2
+initial_state_generator:
+  name: UniformInitialState
+  args:
+    min: 0.0
+    max: 0.0
+    n: 2
+
+control_delta: 0.1

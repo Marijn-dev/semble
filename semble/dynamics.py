@@ -180,6 +180,50 @@ class ParameterisedFitzHughNagumo(ParameterisedDynamics):
         return self.dynamics._dx(x, u)
 
 
+class FitzHughNagumoV2(Dynamics):
+    def __init__(self, theta_0: float, theta_1: float, theta_2: float):
+        super().__init__(2, 1)
+        """Implementation of system used in: https://arxiv.org/pdf/2510.14197"""
+
+        self.theta_0 = theta_0
+        self.theta_1 = theta_1
+        self.theta_2 = theta_2
+
+    def _dx(self, x, z):
+        u, v = x
+
+        du = self.theta_2 * (u - (u**3 / 3) + v - z[0])
+        dv = -1 * ((u - self.theta_0 + self.theta_1 * v) / self.theta_2)
+
+        return (du, dv)
+
+
+class ParameterisedFitzHughNagumoV2(ParameterisedDynamics):
+    def __init__(
+        self,
+        parameter_generator: dict = None,
+    ):
+        super().__init__(parameter_generator, 2, 1)
+
+        self.dynamics = FitzHughNagumoV2(None, None, None)
+
+    def _set_parameter(self, rng, parameter):
+        if parameter is None:
+            self._parameter = self._parameter_generator.sample(rng)
+        else:
+            self._parameter = parameter
+        print(self._parameter)
+        self.dynamics.theta_0 = self._parameter[0]
+        self.dynamics.theta_1 = self._parameter[1]
+        self.dynamics.theta_2 = self._parameter[2]
+
+    def _get_parameter(self):
+        return self._parameter
+
+    def _dx(self, x, z):
+        return self.dynamics._dx(x, z)
+
+
 class Pendulum(Dynamics):
     def __init__(self, damping: float, freq: float = 2 * np.pi):
         super().__init__(2, 1)
@@ -695,6 +739,7 @@ _dynamics_names = {
     "LinearSys": LinearSys,
     "VanDerPol": VanDerPol,
     "FitzHughNagumo": FitzHughNagumo,
+    "FitzHughNagumoV2": FitzHughNagumoV2,
     "Pendulum": Pendulum,
     "HodgkinHuxleyFS": HodgkinHuxleyFS,
     "HodgkinHuxleyRSA": HodgkinHuxleyRSA,
@@ -707,6 +752,7 @@ _dynamics_names = {
     "TwoTank": TwoTank,
     "ParameterisedVanDerPol": ParameterisedVanDerPol,
     "ParameterisedFitzHughNagumo": ParameterisedFitzHughNagumo,
+    "ParameterisedFitzHughNagumoV2": ParameterisedFitzHughNagumoV2,
     "ParameterisedCellTransmissionModel": ParameterisedCellTransmissionModel,
     "ParameterisedNewellDaganzoTraffic": ParameterisedNewellDaganzoTraffic,
 }
